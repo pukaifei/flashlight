@@ -1,0 +1,14 @@
+cpp_unittest(
+    name = "frontend_test",
+    srcs = [
+        "FrontendTest.cpp",
+    ],
+    deps = [
+        "//deeplearning/projects/wav2letter/src/experimental/frontend:frontend",
+        "//deeplearning/projects/wav2letter/src/module:module",
+        "//deeplearning/projects/wav2letter/src/runtime:runtime",
+    ],
+    external_deps = [
+        ("googletest", None, "gtest"),
+    ],
+)

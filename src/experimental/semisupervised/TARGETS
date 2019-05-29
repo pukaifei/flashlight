@@ -1,0 +1,19 @@
+load("@fbcode_macros//build_defs:cpp_binary.bzl", "cpp_binary")
+
+cpp_binary(
+    name = "train_ss_cpp",
+    srcs = [
+        "Train.cpp",
+    ],
+    deps = [
+        "//deeplearning/projects/wav2letter/src/common:common",
+        "//deeplearning/projects/wav2letter/src/criterion:criterion",
+        "//deeplearning/projects/wav2letter/src/experimental/semisupervised/runtime:runtime",
+        "//deeplearning/projects/wav2letter/src/module:module",
+        "//deeplearning/projects/wav2letter/src/runtime:runtime",
+    ],
+    external_deps = [
+        "gflags",
+        "glog",
+    ],
+)
