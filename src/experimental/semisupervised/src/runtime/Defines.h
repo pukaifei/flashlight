@@ -22,6 +22,7 @@ constexpr const char* kReloadPath = "reloadPath";
 constexpr const char* kRunStatus = "runStatus";
 constexpr const char* kStartEpoch = "startEpoch";
 constexpr const char* kStartIter = "startIter";
+constexpr const char* kForkAMMode = "forkam";
 
 // meter
 constexpr const char* kTarget = "target";
@@ -43,6 +44,9 @@ constexpr size_t kDataTypeIdx = kNumDataIdx;
 constexpr size_t kGlobalBatchIdx = kNumDataIdx + 1;
 constexpr size_t kParallelData = 1;
 constexpr size_t kUnpairedAudio = 2;
+constexpr const char* kRandomOrder = "random";
+constexpr const char* kInOrder = "inorder";
+constexpr const char* kUniformOrder = "uniform";
 
 // language model
 constexpr const char* kLMCECrit = "crossEntropy";
@@ -53,6 +57,8 @@ constexpr const char* kLMASCrit = "adaptiveSoftmax";
 DECLARE_string(trainaudio);
 DECLARE_int64(pairediter);
 DECLARE_int64(audioiter);
+DECLARE_int64(audiowarmupepochs);
+DECLARE_string(schedulerorder);
 
 // lmcrit
 DECLARE_string(lmdict);
@@ -61,8 +67,7 @@ DECLARE_string(lmarchfile);
 DECLARE_string(lmweightfile);
 DECLARE_string(lmadasoftmaxcutoff);
 DECLARE_int64(lmadasoftmaxinputdim);
-DECLARE_bool(gumbel);
-DECLARE_double(gumbeltemperature);
 DECLARE_int64(lmtempstepsize);
+DECLARE_string(unpairedSampling);
 
 } // namespace w2l

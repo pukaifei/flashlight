@@ -60,7 +60,7 @@ class LogHelper {
   void logStatus(
       SSLTrainMeters& mtrs,
       int64_t epoch,
-      std::unordered_map<std::string, double>& logFields);
+      const std::unordered_map<std::string, double>& logFields);
 
   void saveModel(
       const std::string& tag,
@@ -76,21 +76,23 @@ class LogHelper {
       std::shared_ptr<fl::Module> network,
       std::shared_ptr<SequenceCriterion> criterion,
       std::shared_ptr<LMCritic> lmcrit,
-      std::shared_ptr<fl::FirstOrderOptimizer> netoptim);
+      std::shared_ptr<fl::FirstOrderOptimizer> netoptim,
+      const std::unordered_map<std::string, double>& logFields);
 
-  std::pair<std::string, std::string> formatStatus(
+  std::string formatStatus(
       SSLTrainMeters& meters,
       int64_t epoch,
-      std::unordered_map<std::string, double>& logFields,
+      const std::unordered_map<std::string, double>& logFields,
       bool verbose = false,
       bool date = false,
-      const std::string& separator = " ");
+      const std::string& separator = " ",
+      bool headerOnly = false);
 
  private:
   int runIdx_;
   std::string runPath_;
   bool isMaster_, logOnEpoch_;
-  std::ofstream logFile_, perfFile_;
+  std::string logFileName_, perfFileName_;
   // best perf so far on valid datasets
   std::unordered_map<std::string, double> validminerrs_;
 

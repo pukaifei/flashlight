@@ -17,14 +17,10 @@ LMCritic::LMCritic(
     const std::vector<int>& dictIndexMap,
     int numDictPadding,
     int startIndex,
-    int unkIndex /* = -1 */,
-    bool useGumbel /* = false */,
-    double gumbelTemperature /* = 0.0 */)
+    int unkIndex /* = -1 */)
     : dictIndexMap_(dictIndexMap.size(), dictIndexMap.data()),
       numDictPadding_(numDictPadding),
-      unkIndex_(unkIndex),
-      useGumbel_(useGumbel),
-      gumbelTemperature_(gumbelTemperature) {
+      unkIndex_(unkIndex) {
   add(network);
 
   af::array startProb = af::constant(0.0, dictIndexMap.size(), f32);
@@ -38,22 +34,13 @@ std::vector<Variable> LMCritic::forward(const std::vector<Variable>& inputs) {
   }
 
   // [nClass, targetlen, batchsize], expects log prob as input
-  const auto& logProbInput = inputs[0];
-  int U = logProbInput.dims(1);
-  int B = logProbInput.dims(2);
+  auto probInput = exp(inputs[0]);
+  int U = probInput.dims(1);
+  int B = probInput.dims(2);
   if (U == 0) {
     throw std::invalid_argument("Invalid input variable size");
   }
 
-  Variable probInput;
-  if (train_ && useGumbel_) {
-    double eps = 1e-7;
-    auto gb = -log(-log((1 - 2 * eps) * af::randu(logProbInput.dims()) + eps));
-    probInput =
-        softmax((logProbInput + Variable(gb, false)) / gumbelTemperature_, 0);
-  } else {
-    probInput = exp(logProbInput);
-  }
   probInput = preprocessInput(probInput);
 
   // pad start token
@@ -121,14 +108,6 @@ Variable LMCritic::preprocessInput(Variable input) {
   }
 
   return result;
-}
-
-double LMCritic::getTemperature() {
-  return gumbelTemperature_;
-}
-
-void LMCritic::setTemperature(double t) {
-  gumbelTemperature_ = t;
 }
 
 std::string LMCritic::prettyString() const {

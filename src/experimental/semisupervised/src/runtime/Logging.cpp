@@ -29,13 +29,16 @@ LogHelper::LogHelper(
       isMaster_(isMaster),
       logOnEpoch_(logOnEpoch) {
   if (isMaster_) {
+    logFileName_ = getRunFile("log", runIdx_, runPath_);
+    perfFileName_ = getRunFile("perf", runIdx_, runPath_);
     dirCreate(runPath_);
-    logFile_.open(getRunFile("log", runIdx_, runPath_));
-    if (!logFile_.is_open()) {
+    std::ofstream logFile, perfFile;
+    logFile.open(logFileName_);
+    if (!logFile.is_open()) {
       LOG(FATAL) << "failed to open log file for writing";
     }
-    perfFile_.open(getRunFile("perf", runIdx_, runPath_));
-    if (!perfFile_.is_open()) {
+    perfFile.open(perfFileName_);
+    if (!perfFile.is_open()) {
       LOG(FATAL) << "failed to open perf file for writing";
     }
   }
@@ -57,15 +60,16 @@ void LogHelper::writeHeader(SSLTrainMeters& meters) {
     return;
   }
 
-  std::unordered_map<std::string, double> dummy;
-  auto perfMsg = formatStatus(meters, 0, dummy, false, true, "\t").first;
-  appendToLog(perfFile_, "# " + perfMsg);
+  std::ofstream perfFile;
+  perfFile.open(perfFileName_);
+  auto perfMsg = formatStatus(meters, 0, {}, false, true, "\t", true);
+  appendToLog(perfFile, "# " + perfMsg);
 }
 
 void LogHelper::logStatus(
     SSLTrainMeters& mtrs,
     int64_t epoch,
-    std::unordered_map<std::string, double>& logFields) {
+    const std::unordered_map<std::string, double>& logFields) {
   syncMeter(mtrs);
 
   if (!isMaster_) {
@@ -73,12 +77,16 @@ void LogHelper::logStatus(
   }
 
   try {
+    std::ofstream logFile, perfFile;
+    logFile.open(logFileName_, std::ofstream::out | std::ofstream::app);
+    perfFile.open(perfFileName_, std::ofstream::out | std::ofstream::app);
     auto logMsg =
-        formatStatus(mtrs, epoch, logFields, true, false, " | ").second;
-    auto perfMsg = formatStatus(mtrs, epoch, logFields, false, true).second;
+        formatStatus(mtrs, epoch, logFields, true, false, " | ", false);
+    auto perfMsg =
+        formatStatus(mtrs, epoch, logFields, false, true, " ", false);
     LOG_MASTER(INFO) << logMsg;
-    appendToLog(logFile_, logMsg);
-    appendToLog(perfFile_, perfMsg);
+    appendToLog(logFile, logMsg);
+    appendToLog(perfFile, perfMsg);
   } catch (const std::exception& ex) {
     LOG(ERROR) << "Error while writing logs: " << ex.what();
   }
@@ -110,16 +118,14 @@ void LogHelper::logAndSaveModel(
     std::shared_ptr<fl::Module> network,
     std::shared_ptr<SequenceCriterion> criterion,
     std::shared_ptr<LMCritic> lmcrit,
-    std::shared_ptr<fl::FirstOrderOptimizer> netoptim) {
+    std::shared_ptr<fl::FirstOrderOptimizer> netoptim,
+    const std::unordered_map<std::string, double>& logFields) {
   int iter = logOnEpoch_ ? std::stoi(config.at(kEpoch))
                          : std::stoi(config.at(kIteration));
   std::string tag = "last";
   if (FLAGS_itersave) {
     tag = logOnEpoch_ ? format("epoch_%04d", iter) : format("iter_%08d", iter);
   }
-
-  std::unordered_map<std::string, double> logFields(
-      {{"lr", netoptim->getLr()}, {"lmcrit-t", lmcrit->getTemperature()}});
 
   logStatus(meters, iter, logFields);
   saveModel(tag, config, network, criterion, lmcrit, netoptim);
@@ -134,13 +140,14 @@ void LogHelper::logAndSaveModel(
   }
 }
 
-std::pair<std::string, std::string> LogHelper::formatStatus(
+std::string LogHelper::formatStatus(
     SSLTrainMeters& meters,
     int64_t epoch,
-    std::unordered_map<std::string, double>& logFields,
+    const std::unordered_map<std::string, double>& logFields,
     bool verbose /* = false */,
     bool date /* = false */,
-    const std::string& separator /* = " " */) {
+    const std::string& separator /* = " " */,
+    bool headerOnly /* = false */) {
   std::string errtype = "XER";
   errtype[0] = std::toupper(FLAGS_target[0]);
   std::string header, status;
@@ -177,8 +184,9 @@ std::pair<std::string, std::string> LogHelper::formatStatus(
     insertItem("iter", format("%8d", epoch));
   }
 
-  insertItem("lr", format("%4.6lf", logFields["lr"]));
-  insertItem("lmcrit-t", format("%4.6lf", logFields["lmcrit-t"]));
+  insertItem("lr", headerOnly ? "" : format("%4.6lf", logFields.at("lr")));
+  insertItem(
+      "lmcrit-t", headerOnly ? "" : format("%4.6lf", logFields.at("lmcrit-t")));
 
   int rt = meters.timer[kRuntime].value();
   insertItem(
@@ -219,7 +227,7 @@ std::pair<std::string, std::string> LogHelper::formatStatus(
   insertItem(
       "thrpt(sec/sec)",
       timeTakenSec > 0.0 ? format("%.2f", audioProcSec / timeTakenSec) : "n/a");
-  return {header, status};
+  return headerOnly ? header : status;
 }
 
 template <>

@@ -22,34 +22,24 @@ class LMCritic : public fl::Container {
       const std::vector<int>& dictIndexMap,
       int numDictPadding,
       int startIndex,
-      int unkIndex = -1,
-      bool useGumbel = false,
-      double gumbelTemperature = 0.0);
+      int unkIndex = -1);
 
   std::vector<fl::Variable> forward(
       const std::vector<fl::Variable>& inputs) override;
 
   std::string prettyString() const override;
 
-  double getTemperature();
-
-  void setTemperature(double t);
-
  private:
   af::array dictIndexMap_;
   fl::Variable startProb_;
   int numDictPadding_, unkIndex_;
-  bool useGumbel_;
-  double gumbelTemperature_;
 
   FL_SAVE_LOAD_WITH_BASE(
       Container,
       dictIndexMap_,
       startProb_,
       numDictPadding_,
-      unkIndex_,
-      useGumbel_,
-      gumbelTemperature_)
+      unkIndex_)
 
   LMCritic() = default;
 

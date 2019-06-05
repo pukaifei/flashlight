@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <random>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -45,10 +46,13 @@ class DataScheduler {
   std::vector<std::shared_ptr<W2lDataset>> ds_;
   std::vector<int64_t> dataTypes_;
   std::vector<int64_t> dsNumIters_;
+  std::vector<int64_t> dsCumNumIters_;
   std::vector<int64_t> dsCurIter_;
   std::vector<int64_t> dsIterOffset_;
   std::vector<int64_t> dsCurEpochs_;
   size_t curDs_;
+
+  std::mt19937 gen_;
 
   DataScheduler() {}
 

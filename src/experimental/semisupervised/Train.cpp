@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
 
   /* =========== Create Network & Optimizers / Reload Snapshot ============ */
   std::shared_ptr<fl::Module> network;
-  std::shared_ptr<SequenceCriterion> criterion;
+  std::shared_ptr<Seq2SeqCriterion> criterion;
   std::shared_ptr<LMCritic> lmcrit;
   std::shared_ptr<fl::FirstOrderOptimizer> netoptim;
 
@@ -101,7 +101,15 @@ int main(int argc, char** argv) {
     lmcrit = createLMCritic(lmDict, dict);
   } else {
     std::unordered_map<std::string, std::string> cfg; // unused
-    W2lSerializer::load(reloadPath, cfg, network, criterion, netoptim, lmcrit);
+    std::shared_ptr<SequenceCriterion> base_criterion;
+    if (runStatus == kForkAMMode) {
+      W2lSerializer::load(reloadPath, cfg, network, base_criterion, netoptim);
+      lmcrit = createLMCritic(lmDict, dict);
+    } else {
+      W2lSerializer::load(
+          reloadPath, cfg, network, base_criterion, netoptim, lmcrit);
+    }
+    criterion = std::dynamic_pointer_cast<Seq2SeqCriterion>(base_criterion);
   }
 
   LOG_MASTER(INFO) << "[Network] " << network->prettyString();
@@ -111,7 +119,7 @@ int main(int argc, char** argv) {
   LOG_MASTER(INFO) << "[LMCritic] " << lmcrit->prettyString();
   LOG_MASTER(INFO) << "[LMCritic Params: " << numTotalParams(lmcrit) << "]";
 
-  if (runStatus == kTrainMode || runStatus == kForkMode) {
+  if (runStatus != kContinueMode) {
     netoptim = initOptimizer(
         {network, criterion},
         FLAGS_netoptim,
@@ -208,18 +216,23 @@ int main(int argc, char** argv) {
 
       double lmTempScale =
           std::pow(FLAGS_gamma, curEpoch / FLAGS_lmtempstepsize);
-      lmcrit->setTemperature(lmTempScale * FLAGS_gumbeltemperature);
-
-      // TODO: support updating the iterations based on curEpoch
-      // e.g. warming up #iterations for the unpaired audio set
 
       ++curEpoch;
-
       af::sync();
       meters.timer[kSampleTimer].resume();
       meters.timer[kRuntime].resume();
       meters.timer[kTimer].resume();
       LOG_MASTER(INFO) << "Epoch " << curEpoch << " started!";
+
+      // linearly warm up the amount of unpaired audio data used in training
+      if (FLAGS_audiowarmupepochs > 0 && curEpoch > FLAGS_pretrainWindow &&
+          (curEpoch - FLAGS_pretrainWindow) <= FLAGS_audiowarmupepochs) {
+        int unpairedIter = (curEpoch - FLAGS_pretrainWindow) * FLAGS_audioiter /
+            FLAGS_audiowarmupepochs;
+        trainDscheduler.setSchedule({FLAGS_pairediter, unpairedIter});
+        nItersPerEpoch = FLAGS_pairediter + unpairedIter;
+      }
+
       int scheduleIter = 0;
       while (scheduleIter < nItersPerEpoch) {
         auto sample = trainDscheduler.get();
@@ -242,30 +255,42 @@ int main(int argc, char** argv) {
         af::sync();
 
         meters.timer[kCritFwdTimer].resume();
-        auto target =
-            isPairedData ? fl::noGrad(sample[kTargetIdx]) : fl::Variable();
-        auto critFwd = criterion->forward({output, target});
+        if (isPairedData) {
+          criterion->setSampling(
+              FLAGS_samplingstrategy, FLAGS_pctteacherforcing);
+        } else { // isUnpairedAudio
+          criterion->setSampling(FLAGS_unpairedSampling, -1);
+          criterion->setGumbelTemperature(
+              lmTempScale * FLAGS_gumbeltemperature);
+        }
+
+        // For unpaired audio, we currently use the target length to determine
+        // the number of decoding steps, but we won't use the loss for training.
+        auto critFwd =
+            criterion->forward({output, fl::noGrad(sample[kTargetIdx])});
+        auto s2sLoss = critFwd[0];
+        auto s2sLogProb = critFwd[1];
         af::sync();
         meters.timer[kCritFwdTimer].stopAndIncUnit();
 
-        if (af::anyTrue<bool>(af::isNaN(critFwd[0].array()))) {
-          LOG(FATAL) << "ASR loss has NaN values";
-        }
-
-        meters.timer[kLMCritFwdTimer].resume();
-        auto lmcritLoss = lmcrit->forward({critFwd[1]}).front();
-        af::sync();
-        meters.timer[kLMCritFwdTimer].stopAndIncUnit();
-
-        if (af::anyTrue<bool>(af::isNaN(lmcritLoss.array()))) {
-          LOG(FATAL) << "LMCritic loss has NaN values";
-        }
-        meters.train.losses[kLM].add(lmcritLoss.array());
-
-        fl::Variable loss = lmcritLoss;
+        fl::Variable loss;
         if (isPairedData) {
-          meters.train.losses[kASR].add(critFwd[0].array());
-          loss = (1 - FLAGS_lmweight) * critFwd[0] + FLAGS_lmweight * loss;
+          if (af::anyTrue<bool>(af::isNaN(s2sLoss.array()))) {
+            LOG(FATAL) << "ASR loss has NaN values";
+          }
+          meters.train.losses[kASR].add(s2sLoss.array());
+          loss = s2sLoss;
+        } else {
+          meters.timer[kLMCritFwdTimer].resume();
+          auto lmcritLoss = lmcrit->forward({s2sLogProb}).front();
+          af::sync();
+          meters.timer[kLMCritFwdTimer].stopAndIncUnit();
+
+          if (af::anyTrue<bool>(af::isNaN(lmcritLoss.array()))) {
+            LOG(FATAL) << "LMCritic loss has NaN values";
+          }
+          meters.train.losses[kLM].add(lmcritLoss.array());
+          loss = FLAGS_lmweight * lmcritLoss;
         }
         af::sync();
         meters.timer[kFwdTimer].stopAndIncUnit();
@@ -324,8 +349,11 @@ int main(int argc, char** argv) {
 
           config[kEpoch] = std::to_string(curEpoch);
           config[kIteration] = std::to_string(curIter);
+          std::unordered_map<std::string, double> logFields(
+              {{"lr", netoptim->getLr()},
+               {"lmcrit-t", lmTempScale * FLAGS_gumbeltemperature}});
           logHelper.logAndSaveModel(
-              meters, config, network, criterion, lmcrit, netoptim);
+              meters, config, network, criterion, lmcrit, netoptim, logFields);
 
           resetDatasetMeters(meters.train);
           resetTimeStatMeters(meters);
@@ -345,10 +373,12 @@ int main(int argc, char** argv) {
 
   /* ===================== Training starts ===================== */
   if (FLAGS_pretrainWindow - startEpoch > 0) {
+    nItersPerEpoch = pairedDs->size();
     trainDscheduler.setSchedule({pairedDs->size(), 0});
     train(FLAGS_pretrainWindow);
     auto s2s = std::dynamic_pointer_cast<Seq2SeqCriterion>(criterion);
     s2s->clearWindow();
+    nItersPerEpoch = FLAGS_pairediter + FLAGS_audioiter;
     trainDscheduler.setSchedule({FLAGS_pairediter, FLAGS_audioiter});
     LOG_MASTER(INFO) << "Finished pretraining";
   }

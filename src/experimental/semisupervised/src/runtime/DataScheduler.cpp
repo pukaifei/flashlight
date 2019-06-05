@@ -8,6 +8,10 @@
 
 #include "experimental/semisupervised/src/runtime/DataScheduler.h"
 
+#include <algorithm>
+#include <limits>
+#include <numeric>
+
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
@@ -27,8 +31,12 @@ DataScheduler::DataScheduler(
       dsNumIters_(numIters.begin(), numIters.end()),
       dsCurIter_(ds_.size(), 0),
       dsIterOffset_(ds_.size(), 0),
-      dsCurEpochs_(ds_.size(), curEpoch) {
-  initialize();
+      dsCurEpochs_(ds_.size(), curEpoch),
+      gen_(FLAGS_seed) {
+  LOG_IF(FATAL, datasets.size() == 0) << "No datasets to be added";
+  LOG_IF(FATAL, ds_.size() != dataTypes_.size())
+      << "mismatch between the number of datasets "
+      << "and the number data types specified";
 
   if (!FLAGS_noresample) {
     for (auto& d : ds_) {
@@ -36,21 +44,44 @@ DataScheduler::DataScheduler(
       d->shuffle(curEpoch);
     }
   }
+  initialize();
 }
 
 void DataScheduler::initialize() {
-  LOG_IF(
-      FATAL,
-      ds_.size() != dsNumIters_.size() || ds_.size() != dataTypes_.size())
+  LOG_IF(FATAL, ds_.size() != dsNumIters_.size())
       << "mismatch between the number of datasets "
-      << "and the number of schedules or data types specified";
+      << "and the number of schedules specified";
 
-  curDs_ = 0;
-  while (curDs_ < dsNumIters_.size() && dsNumIters_[curDs_] == 0) {
-    ++curDs_;
+  dsCumNumIters_.resize(dsNumIters_.size());
+  for (int i = 0; i < dsNumIters_.size(); ++i) {
+    LOG_IF(FATAL, dsNumIters_[i] < 0)
+        << "Invalid training schedule (number of iterations < 0)";
+    if (i == 0) {
+      dsCumNumIters_[i] = dsNumIters_[i];
+    } else {
+      dsCumNumIters_[i] = dsNumIters_[i] + dsCumNumIters_[i - 1];
+    }
   }
-  LOG_IF(FATAL, curDs_ == dsNumIters_.size())
+  LOG_IF(FATAL, dsCumNumIters_.back() == 0)
       << "Invalid training schedule (zero iterations on all datasets)";
+
+  if (FLAGS_schedulerorder == kInOrder) {
+    curDs_ = 0;
+    while (curDs_ < dsNumIters_.size() && dsNumIters_[curDs_] == 0) {
+      ++curDs_;
+    }
+  } else if (FLAGS_schedulerorder == kUniformOrder) {
+    curDs_ = std::max_element(dsNumIters_.begin(), dsNumIters_.end()) -
+        dsNumIters_.begin();
+  } else if (FLAGS_schedulerorder == kRandomOrder) {
+    std::uniform_int_distribution<int> distribution(1, dsCumNumIters_.back());
+    auto d = distribution(gen_);
+    auto lit =
+        std::lower_bound(dsCumNumIters_.begin(), dsCumNumIters_.end(), d);
+    curDs_ = lit - dsCumNumIters_.begin();
+  } else {
+    LOG(FATAL) << "unimplemented order: " << FLAGS_schedulerorder;
+  }
 }
 
 std::vector<af::array> DataScheduler::get() {
@@ -73,12 +104,39 @@ void DataScheduler::update() {
     ds_[curDs_]->shuffle(++dsCurEpochs_[curDs_] /* seed */);
   }
 
-  // switch the dataset for the next iteration if necessary
-  if (dsCurIter_[curDs_] % dsNumIters_[curDs_] == 0) {
-    curDs_ = (curDs_ + 1) % ds_.size();
-    while (dsNumIters_[curDs_] == 0) {
+  if (FLAGS_schedulerorder == kInOrder) {
+    if (dsCurIter_[curDs_] % dsNumIters_[curDs_] == 0) {
       curDs_ = (curDs_ + 1) % ds_.size();
+      while (dsNumIters_[curDs_] == 0) {
+        curDs_ = (curDs_ + 1) % ds_.size();
+      }
     }
+  } else if (FLAGS_schedulerorder == kUniformOrder) {
+    double minVal = std::numeric_limits<double>::max();
+    for (int i = 0; i < ds_.size(); ++i) {
+      if (dsNumIters_[i] > 0) {
+        int offset = dsCurIter_[i] / dsNumIters_[i];
+        double ratio =
+            1.0 / (dsNumIters_[i] + 1) * (dsCurIter_[i] % dsNumIters_[i] + 1);
+        if (offset + ratio < minVal) {
+          minVal = offset + ratio;
+          curDs_ = i;
+        }
+      }
+    }
+  } else if (FLAGS_schedulerorder == kRandomOrder) {
+    for (int c = curDs_; c < dsCumNumIters_.size(); ++c) {
+      --dsCumNumIters_[c];
+    }
+    if (dsCumNumIters_.back() == 0) {
+      std::partial_sum(
+          dsNumIters_.begin(), dsNumIters_.end(), dsCumNumIters_.begin());
+    }
+    std::uniform_int_distribution<int> distribution(1, dsCumNumIters_.back());
+    auto d = distribution(gen_);
+    auto lit =
+        std::lower_bound(dsCumNumIters_.begin(), dsCumNumIters_.end(), d);
+    curDs_ = lit - dsCumNumIters_.begin();
   }
 }
 

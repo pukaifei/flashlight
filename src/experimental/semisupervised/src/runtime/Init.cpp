@@ -23,9 +23,10 @@
 namespace w2l {
 std::unordered_map<std::string, std::string> setFlags(int argc, char** argv) {
   auto readNewFlags = [&]() {
+    auto oldFlagsfile = FLAGS_flagsfile;
     LOG(INFO) << "Parsing command line flags";
     gflags::ParseCommandLineFlags(&argc, &argv, false);
-    if (!FLAGS_flagsfile.empty()) {
+    if (!FLAGS_flagsfile.empty() && FLAGS_flagsfile != oldFlagsfile) {
       LOG(INFO) << "Reading flags from file " << FLAGS_flagsfile;
       gflags::ReadFromFlagsFile(FLAGS_flagsfile, argv[0], true);
     }
@@ -72,7 +73,7 @@ std::unordered_map<std::string, std::string> setFlags(int argc, char** argv) {
     LOG(INFO) << "reload path is " << reloadPath;
     std::tie(startEpoch, startIter) = loadOldFlags(reloadPath);
     readNewFlags();
-  } else if (runStatus == kForkMode) {
+  } else if (runStatus == kForkMode || runStatus == kForkAMMode) {
     reloadPath = argv[2];
     loadOldFlags(reloadPath);
     readNewFlags();
@@ -153,9 +154,7 @@ std::shared_ptr<LMCritic> createLMCritic(
       dictIndexMap,
       numDictPadding,
       lmDict.getIndex(kEosToken),
-      lmDict.getIndex(kUnkToken),
-      FLAGS_gumbel,
-      FLAGS_gumbeltemperature);
+      lmDict.getIndex(kUnkToken));
 
   return lmcrit;
 }
