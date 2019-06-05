@@ -13,7 +13,7 @@
 #include "common/Dictionary.h"
 #include "criterion/criterion.h"
 #include "data/W2lDataset.h"
-#include "experimental/semisupervised/runtime/Logging.h"
+#include "experimental/semisupervised/src/runtime/Logging.h"
 #include "runtime/runtime.h"
 
 namespace w2l {
@@ -27,6 +27,7 @@ void evalOutput(
 void evalDataset(
     std::shared_ptr<fl::Module> ntwrk,
     std::shared_ptr<SequenceCriterion> crit,
+    std::shared_ptr<fl::Module> lmcrit,
     std::shared_ptr<W2lDataset> testds,
     SSLDatasetMeters& mtrs,
     const Dictionary& dict);
@@ -34,6 +35,7 @@ void evalDataset(
 void runEval(
     std::shared_ptr<fl::Module> network,
     std::shared_ptr<SequenceCriterion> criterion,
+    std::shared_ptr<fl::Module> lmcrit,
     const std::unordered_map<std::string, std::shared_ptr<W2lDataset>>& ds,
     SSLTrainMeters& meters,
     const Dictionary& dict);

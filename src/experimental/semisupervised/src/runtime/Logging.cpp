@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "experimental/semisupervised/runtime/Logging.h"
+#include "experimental/semisupervised/src/runtime/Logging.h"
 
 #include <cereal/archives/json.hpp>
 #include <cereal/types/unordered_map.hpp>
@@ -14,7 +14,7 @@
 #include <glog/logging.h>
 
 #include "common/Utils.h"
-#include "experimental/semisupervised/runtime/Defines.h"
+#include "experimental/semisupervised/src/runtime/Defines.h"
 #include "runtime/Serial.h"
 
 namespace w2l {
@@ -57,11 +57,15 @@ void LogHelper::writeHeader(SSLTrainMeters& meters) {
     return;
   }
 
-  auto perfMsg = formatStatus(meters, 0, 0, false, true, "\t").first;
+  std::unordered_map<std::string, double> dummy;
+  auto perfMsg = formatStatus(meters, 0, dummy, false, true, "\t").first;
   appendToLog(perfFile_, "# " + perfMsg);
 }
 
-void LogHelper::logStatus(SSLTrainMeters& mtrs, int64_t epoch, double lr) {
+void LogHelper::logStatus(
+    SSLTrainMeters& mtrs,
+    int64_t epoch,
+    std::unordered_map<std::string, double>& logFields) {
   syncMeter(mtrs);
 
   if (!isMaster_) {
@@ -69,8 +73,9 @@ void LogHelper::logStatus(SSLTrainMeters& mtrs, int64_t epoch, double lr) {
   }
 
   try {
-    auto logMsg = formatStatus(mtrs, epoch, lr, true, false, " | ").second;
-    auto perfMsg = formatStatus(mtrs, epoch, lr, false, true).second;
+    auto logMsg =
+        formatStatus(mtrs, epoch, logFields, true, false, " | ").second;
+    auto perfMsg = formatStatus(mtrs, epoch, logFields, false, true).second;
     LOG_MASTER(INFO) << logMsg;
     appendToLog(logFile_, logMsg);
     appendToLog(perfFile_, perfMsg);
@@ -84,6 +89,7 @@ void LogHelper::saveModel(
     const std::unordered_map<std::string, std::string>& config,
     std::shared_ptr<fl::Module> network,
     std::shared_ptr<SequenceCriterion> criterion,
+    std::shared_ptr<LMCritic> lmcrit,
     std::shared_ptr<fl::FirstOrderOptimizer> netoptim) {
   if (!isMaster_) {
     return;
@@ -92,7 +98,7 @@ void LogHelper::saveModel(
   try {
     std::string filename =
         getRunFile("model_" + cleanFilepath(tag) + ".bin", runIdx_, runPath_);
-    W2lSerializer::save(filename, config, network, criterion, netoptim);
+    W2lSerializer::save(filename, config, network, criterion, netoptim, lmcrit);
   } catch (const std::exception& ex) {
     LOG(FATAL) << "Error while saving models: " << ex.what();
   }
@@ -103,6 +109,7 @@ void LogHelper::logAndSaveModel(
     const std::unordered_map<std::string, std::string>& config,
     std::shared_ptr<fl::Module> network,
     std::shared_ptr<SequenceCriterion> criterion,
+    std::shared_ptr<LMCritic> lmcrit,
     std::shared_ptr<fl::FirstOrderOptimizer> netoptim) {
   int iter = logOnEpoch_ ? std::stoi(config.at(kEpoch))
                          : std::stoi(config.at(kIteration));
@@ -111,15 +118,18 @@ void LogHelper::logAndSaveModel(
     tag = logOnEpoch_ ? format("epoch_%04d", iter) : format("iter_%08d", iter);
   }
 
-  logStatus(meters, iter, netoptim->getLr());
-  saveModel(tag, config, network, criterion, netoptim);
+  std::unordered_map<std::string, double> logFields(
+      {{"lr", netoptim->getLr()}, {"lmcrit-t", lmcrit->getTemperature()}});
+
+  logStatus(meters, iter, logFields);
+  saveModel(tag, config, network, criterion, lmcrit, netoptim);
 
   for (auto& s : meters.valid) {
     double verr = s.second.edits[kTarget].value()[0];
     auto sit = validminerrs_.find(s.first);
     if (sit == validminerrs_.end() || sit->second > verr) {
       validminerrs_[s.first] = verr;
-      saveModel(s.first, config, network, criterion, netoptim);
+      saveModel(s.first, config, network, criterion, lmcrit, netoptim);
     }
   }
 }
@@ -127,7 +137,7 @@ void LogHelper::logAndSaveModel(
 std::pair<std::string, std::string> LogHelper::formatStatus(
     SSLTrainMeters& meters,
     int64_t epoch,
-    double lr,
+    std::unordered_map<std::string, double>& logFields,
     bool verbose /* = false */,
     bool date /* = false */,
     const std::string& separator /* = " " */) {
@@ -166,7 +176,9 @@ std::pair<std::string, std::string> LogHelper::formatStatus(
   } else {
     insertItem("iter", format("%8d", epoch));
   }
-  insertItem("lr", format("%4.6lf", lr));
+
+  insertItem("lr", format("%4.6lf", logFields["lr"]));
+  insertItem("lmcrit-t", format("%4.6lf", logFields["lmcrit-t"]));
 
   int rt = meters.timer[kRuntime].value();
   insertItem(

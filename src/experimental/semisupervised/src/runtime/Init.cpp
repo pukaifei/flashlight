@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "experimental/semisupervised/runtime/Init.h"
+#include "experimental/semisupervised/src/runtime/Init.h"
 
 #include <tuple>
 #include <vector>
@@ -15,7 +15,9 @@
 #include <glog/logging.h>
 
 #include "common/Utils.h"
-#include "experimental/semisupervised/runtime/Defines.h"
+#include "experimental/ConvLM/Utils.h"
+#include "experimental/semisupervised/src/runtime/Defines.h"
+#include "experimental/semisupervised/src/runtime/Utils.h"
 #include "runtime/Serial.h"
 
 namespace w2l {
@@ -100,5 +102,61 @@ std::unordered_map<std::string, std::string> setFlags(int argc, char** argv) {
       {kStartIter, std::to_string(startIter)}};
 
   return config;
+}
+
+std::shared_ptr<fl::Module> initLM(const Dictionary& lmDict) {
+  std::shared_ptr<fl::Module> lmNetwork;
+
+  if (!FLAGS_lm.empty()) {
+    W2lSerializer::load(FLAGS_lm, lmNetwork);
+  } else {
+    std::shared_ptr<fl::BinaryModule> lmCriterion;
+
+    std::vector<int> adaptiveTail;
+    if (FLAGS_lmcrit == kLMASCrit) {
+      auto cutoffs = splitOnAnyOf(",", FLAGS_lmadasoftmaxcutoff, true);
+      for (const auto& val : cutoffs) {
+        adaptiveTail.push_back(std::stoi(val));
+      }
+      adaptiveTail.push_back(lmDict.indexSize());
+    }
+
+    loadConvLM(
+        lmNetwork,
+        lmCriterion,
+        FLAGS_lmarchfile,
+        FLAGS_lmweightfile,
+        lmDict.indexSize(),
+        adaptiveTail,
+        FLAGS_lmadasoftmaxinputdim);
+
+    if (lmCriterion) {
+      auto as = std::static_pointer_cast<fl::AdaptiveSoftMaxLoss>(lmCriterion)
+                    ->getActivation();
+      std::dynamic_pointer_cast<fl::Sequential>(lmNetwork)->add(as);
+    }
+  }
+
+  return lmNetwork;
+}
+
+std::shared_ptr<LMCritic> createLMCritic(
+    const Dictionary& lmDict,
+    const Dictionary& amDict) {
+  auto lmNetwork = initLM(lmDict);
+  std::vector<int> dictIndexMap;
+  int numDictPadding;
+  std::tie(dictIndexMap, numDictPadding) = genTokenDictIndexMap(lmDict, amDict);
+
+  auto lmcrit = std::make_shared<LMCritic>(
+      lmNetwork,
+      dictIndexMap,
+      numDictPadding,
+      lmDict.getIndex(kEosToken),
+      lmDict.getIndex(kUnkToken),
+      FLAGS_gumbel,
+      FLAGS_gumbeltemperature);
+
+  return lmcrit;
 }
 } // namespace w2l

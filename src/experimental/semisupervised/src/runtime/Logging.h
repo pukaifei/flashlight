@@ -16,7 +16,8 @@
 #include <flashlight/flashlight.h>
 
 #include "criterion/criterion.h"
-#include "experimental/semisupervised/runtime/Defines.h"
+#include "experimental/semisupervised/src/module/LMCritic.h"
+#include "experimental/semisupervised/src/runtime/Defines.h"
 #include "runtime/Logger.h"
 
 namespace w2l {
@@ -43,6 +44,7 @@ struct SSLTrainMeters {
                {kSampleTimer, fl::TimeMeter(true)},
                {kFwdTimer, fl::TimeMeter(true)},
                {kCritFwdTimer, fl::TimeMeter(true)},
+               {kLMCritFwdTimer, fl::TimeMeter(true)},
                {kBwdTimer, fl::TimeMeter(true)},
                {kOptimTimer, fl::TimeMeter(true)}}) {}
 };
@@ -55,13 +57,17 @@ class LogHelper {
 
   void writeHeader(SSLTrainMeters& meters);
 
-  void logStatus(SSLTrainMeters& mtrs, int64_t epoch, double lr);
+  void logStatus(
+      SSLTrainMeters& mtrs,
+      int64_t epoch,
+      std::unordered_map<std::string, double>& logFields);
 
   void saveModel(
       const std::string& tag,
       const std::unordered_map<std::string, std::string>& config,
       std::shared_ptr<fl::Module> network,
       std::shared_ptr<SequenceCriterion> criterion,
+      std::shared_ptr<LMCritic> lmcrit,
       std::shared_ptr<fl::FirstOrderOptimizer> netoptim);
 
   void logAndSaveModel(
@@ -69,12 +75,13 @@ class LogHelper {
       const std::unordered_map<std::string, std::string>& config,
       std::shared_ptr<fl::Module> network,
       std::shared_ptr<SequenceCriterion> criterion,
+      std::shared_ptr<LMCritic> lmcrit,
       std::shared_ptr<fl::FirstOrderOptimizer> netoptim);
 
   std::pair<std::string, std::string> formatStatus(
       SSLTrainMeters& meters,
       int64_t epoch,
-      double lr,
+      std::unordered_map<std::string, double>& logFields,
       bool verbose = false,
       bool date = false,
       const std::string& separator = " ");

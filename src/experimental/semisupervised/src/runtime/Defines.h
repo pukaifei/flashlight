@@ -33,6 +33,7 @@ constexpr const char* kTimer = "bch";
 constexpr const char* kSampleTimer = "smp";
 constexpr const char* kFwdTimer = "fwd";
 constexpr const char* kCritFwdTimer = "crit-fwd";
+constexpr const char* kLMCritFwdTimer = "lmcrit-fwd";
 constexpr const char* kBwdTimer = "bwd";
 constexpr const char* kOptimTimer = "optim";
 
@@ -43,9 +44,25 @@ constexpr size_t kGlobalBatchIdx = kNumDataIdx + 1;
 constexpr size_t kParallelData = 1;
 constexpr size_t kUnpairedAudio = 2;
 
+// language model
+constexpr const char* kLMCECrit = "crossEntropy";
+constexpr const char* kLMASCrit = "adaptiveSoftmax";
+
 // flags
+// data scheduler
 DECLARE_string(trainaudio);
 DECLARE_int64(pairediter);
 DECLARE_int64(audioiter);
+
+// lmcrit
+DECLARE_string(lmdict);
+DECLARE_string(lmcrit);
+DECLARE_string(lmarchfile);
+DECLARE_string(lmweightfile);
+DECLARE_string(lmadasoftmaxcutoff);
+DECLARE_int64(lmadasoftmaxinputdim);
+DECLARE_bool(gumbel);
+DECLARE_double(gumbeltemperature);
+DECLARE_int64(lmtempstepsize);
 
 } // namespace w2l

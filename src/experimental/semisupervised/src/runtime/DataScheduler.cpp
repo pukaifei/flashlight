@@ -6,13 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "experimental/semisupervised/runtime/DataScheduler.h"
+#include "experimental/semisupervised/src/runtime/DataScheduler.h"
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include "common/Defines.h"
-#include "experimental/semisupervised/runtime/Defines.h"
+#include "experimental/semisupervised/src/runtime/Defines.h"
 #include "runtime/Logger.h"
 
 namespace w2l {

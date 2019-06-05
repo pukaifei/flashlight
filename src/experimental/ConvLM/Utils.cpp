@@ -98,7 +98,9 @@ void loadLayer(
     Variable weights;
     if (states[idx].paramName == "weight") {
       setIdx++;
-      if (dynamic_pointer_cast<fl::Embedding>(layer) != nullptr) {
+      if (dynamic_pointer_cast<fl::Embedding>(layer) ||
+          dynamic_pointer_cast<fl::Linear>(
+              layer)) { // a hack to load the embedding layer as a linear layer
         weights = Variable(states[idx].weights.T(), useGrad);
       } else {
         weights = Variable(states[idx].weights, useGrad);

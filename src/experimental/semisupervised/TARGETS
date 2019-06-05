@@ -8,7 +8,8 @@ cpp_binary(
     deps = [
         "//deeplearning/projects/wav2letter/src/common:common",
         "//deeplearning/projects/wav2letter/src/criterion:criterion",
-        "//deeplearning/projects/wav2letter/src/experimental/semisupervised/runtime:runtime",
+        "//deeplearning/projects/wav2letter/src/experimental/semisupervised/src/module:module",
+        "//deeplearning/projects/wav2letter/src/experimental/semisupervised/src/runtime:runtime",
         "//deeplearning/projects/wav2letter/src/module:module",
         "//deeplearning/projects/wav2letter/src/runtime:runtime",
     ],

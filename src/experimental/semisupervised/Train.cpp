@@ -20,7 +20,8 @@
 #include "common/Utils.h"
 #include "criterion/criterion.h"
 #include "data/Featurize.h"
-#include "experimental/semisupervised/runtime/runtime.h"
+#include "experimental/semisupervised/src/module/LMCritic.h"
+#include "experimental/semisupervised/src/runtime/runtime.h"
 #include "module/module.h"
 #include "runtime/runtime.h"
 
@@ -73,6 +74,7 @@ int main(int argc, char** argv) {
   /* ===================== Create Dictionary & Lexicon ===================== */
   Dictionary dict = createTokenDict();
   int numClasses = dict.indexSize();
+  dict.setDefaultIndex(numClasses);
   LOG_MASTER(INFO) << "Number of classes (network) = " << numClasses;
 
   DictionaryMap dicts;
@@ -80,9 +82,12 @@ int main(int argc, char** argv) {
 
   auto lexicon = loadWords(FLAGS_lexicon, FLAGS_maxword);
 
+  Dictionary lmDict = createFairseqTokenDict(FLAGS_lmdict);
+
   /* =========== Create Network & Optimizers / Reload Snapshot ============ */
   std::shared_ptr<fl::Module> network;
   std::shared_ptr<SequenceCriterion> criterion;
+  std::shared_ptr<LMCritic> lmcrit;
   std::shared_ptr<fl::FirstOrderOptimizer> netoptim;
 
   if (runStatus == kTrainMode) {
@@ -93,19 +98,18 @@ int main(int argc, char** argv) {
     network = createW2lSeqModule(archfile, numFeatures, numClasses);
     criterion = std::make_shared<Seq2SeqCriterion>(
         buildSeq2Seq(numClasses, dict.getIndex(kEosToken)));
+    lmcrit = createLMCritic(lmDict, dict);
   } else {
     std::unordered_map<std::string, std::string> cfg; // unused
-    W2lSerializer::load(reloadPath, cfg, network, criterion, netoptim);
+    W2lSerializer::load(reloadPath, cfg, network, criterion, netoptim, lmcrit);
   }
-
-  // TODO: load an LM module. We don't need to save LM-crit as it won't be used
-  // during decoding, so always loading from file should be good enough for now.
-  std::shared_ptr<fl::Module> lmcrit;
 
   LOG_MASTER(INFO) << "[Network] " << network->prettyString();
   LOG_MASTER(INFO) << "[Network Params: " << numTotalParams(network) << "]";
   LOG_MASTER(INFO) << "[Criterion] " << criterion->prettyString();
   LOG_MASTER(INFO) << "[Criterion Params: " << numTotalParams(criterion) << "]";
+  LOG_MASTER(INFO) << "[LMCritic] " << lmcrit->prettyString();
+  LOG_MASTER(INFO) << "[LMCritic Params: " << numTotalParams(lmcrit) << "]";
 
   if (runStatus == kTrainMode || runStatus == kForkMode) {
     netoptim = initOptimizer(
@@ -148,7 +152,7 @@ int main(int argc, char** argv) {
       {pairedDs, unpairedAudioDs},
       {kParallelData, kUnpairedAudio},
       {FLAGS_pairediter, FLAGS_audioiter},
-      startEpoch);
+      startEpoch + 1);
 
   int64_t nItersPerEpoch = FLAGS_pairediter + FLAGS_audioiter;
 
@@ -196,10 +200,15 @@ int main(int argc, char** argv) {
     bool isPairedData;
     network->train();
     criterion->train();
+    lmcrit->eval();
 
     while (curEpoch < nEpochs) {
       double lrScale = std::pow(FLAGS_gamma, curEpoch / FLAGS_stepsize);
       netoptim->setLr(lrScale * FLAGS_lr);
+
+      double lmTempScale =
+          std::pow(FLAGS_gamma, curEpoch / FLAGS_lmtempstepsize);
+      lmcrit->setTemperature(lmTempScale * FLAGS_gumbeltemperature);
 
       // TODO: support updating the iterations based on curEpoch
       // e.g. warming up #iterations for the unpaired audio set
@@ -232,25 +241,35 @@ int main(int argc, char** argv) {
         auto output = network->forward({fl::input(sample[kInputIdx])}).front();
         af::sync();
 
-        fl::Variable loss;
-        // ASR loss for parallel data
-        if (isPairedData) {
-          meters.timer[kCritFwdTimer].resume();
-          loss = criterion->forward({output, fl::noGrad(sample[kTargetIdx])})
-                     .front();
-          af::sync();
-          meters.timer[kCritFwdTimer].stopAndIncUnit();
+        meters.timer[kCritFwdTimer].resume();
+        auto target =
+            isPairedData ? fl::noGrad(sample[kTargetIdx]) : fl::Variable();
+        auto critFwd = criterion->forward({output, target});
+        af::sync();
+        meters.timer[kCritFwdTimer].stopAndIncUnit();
 
-          if (af::anyTrue<bool>(af::isNaN(loss.array()))) {
-            LOG(FATAL) << "ASR loss has NaN values";
-          }
-          meters.train.losses[kASR].add(loss.array());
+        if (af::anyTrue<bool>(af::isNaN(critFwd[0].array()))) {
+          LOG(FATAL) << "ASR loss has NaN values";
         }
 
-        // TODO: incorporate LM-crit loss, add timer,
-        // add to both meters.train.losses[kLM] and
-        // meters.train.losses[kFullModel] for logging
+        meters.timer[kLMCritFwdTimer].resume();
+        auto lmcritLoss = lmcrit->forward({critFwd[1]}).front();
+        af::sync();
+        meters.timer[kLMCritFwdTimer].stopAndIncUnit();
+
+        if (af::anyTrue<bool>(af::isNaN(lmcritLoss.array()))) {
+          LOG(FATAL) << "LMCritic loss has NaN values";
+        }
+        meters.train.losses[kLM].add(lmcritLoss.array());
+
+        fl::Variable loss = lmcritLoss;
+        if (isPairedData) {
+          meters.train.losses[kASR].add(critFwd[0].array());
+          loss = (1 - FLAGS_lmweight) * critFwd[0] + FLAGS_lmweight * loss;
+        }
+        af::sync();
         meters.timer[kFwdTimer].stopAndIncUnit();
+        meters.train.losses[kFullModel].add(loss.array());
 
         // compute training error rate from parallel data
         if (isPairedData) {
@@ -268,6 +287,7 @@ int main(int argc, char** argv) {
         // backward
         meters.timer[kBwdTimer].resume();
         netoptim->zeroGrad();
+        lmcrit->zeroGrad();
         loss.backward();
         if (reducer) {
           reducer->finalize();
@@ -299,12 +319,13 @@ int main(int argc, char** argv) {
         if ((!logOnEpoch && curIter % FLAGS_reportiters == 0) ||
             (logOnEpoch && scheduleIter == nItersPerEpoch)) {
           stopTimeMeters(meters);
-          runEval(network, criterion, validds, meters, dicts[kTargetIdx]);
+          runEval(
+              network, criterion, lmcrit, validds, meters, dicts[kTargetIdx]);
 
           config[kEpoch] = std::to_string(curEpoch);
           config[kIteration] = std::to_string(curIter);
           logHelper.logAndSaveModel(
-              meters, config, network, criterion, netoptim);
+              meters, config, network, criterion, lmcrit, netoptim);
 
           resetDatasetMeters(meters.train);
           resetTimeStatMeters(meters);

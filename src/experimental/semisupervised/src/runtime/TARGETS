@@ -8,6 +8,7 @@ cpp_library(
         "Eval.cpp",
         "Init.cpp",
         "Logging.cpp",
+        "Utils.cpp",
     ],
     headers = [
         "DataScheduler.h",
@@ -15,12 +16,15 @@ cpp_library(
         "Eval.h",
         "Init.h",
         "Logging.h",
+        "Utils.h",
         "runtime.h",
     ],
     deps = [
         "//deeplearning/projects/wav2letter/src/common:common",
         "//deeplearning/projects/wav2letter/src/criterion:criterion",
         "//deeplearning/projects/wav2letter/src/data:data",
+        "//deeplearning/projects/wav2letter/src/experimental/ConvLM:utils",
+        "//deeplearning/projects/wav2letter/src/experimental/semisupervised/src/module:module",
         "//deeplearning/projects/wav2letter/src/runtime:runtime",
     ],
     external_deps = [
