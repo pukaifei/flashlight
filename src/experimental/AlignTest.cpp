@@ -15,11 +15,11 @@ TEST(AlignTest, getAlignedWords) {
                                    "o", "o", "r", "l", "l", "d", "|"};
 
   auto words = getAlignedWords(ltrs, 2);
-  CHECK_EQ(words[0].word, "$");
-  CHECK_EQ(words[1].word, "hello");
-  CHECK_EQ(words[2].word, "$");
-  CHECK_EQ(words[3].word, "world");
-  CHECK_EQ(words[4].word, "$");
+  ASSERT_EQ(words[0].word, "$");
+  ASSERT_EQ(words[1].word, "hello");
+  ASSERT_EQ(words[2].word, "$");
+  ASSERT_EQ(words[3].word, "world");
+  ASSERT_EQ(words[4].word, "$");
 }
 
 TEST(AlignTest, getAlignedWordSplits1) {
@@ -28,11 +28,11 @@ TEST(AlignTest, getAlignedWordSplits1) {
                                    "|", "w", "o", "o", "r", "l", "l", "d", "|"};
 
   auto words = getAlignedWords(ltrs, 2);
-  CHECK_EQ(words[0].word, "$");
-  CHECK_EQ(words[1].word, "hello");
-  CHECK_EQ(words[2].word, "$");
-  CHECK_EQ(words[3].word, "world");
-  CHECK_EQ(words[4].word, "$");
+  ASSERT_EQ(words[0].word, "$");
+  ASSERT_EQ(words[1].word, "hello");
+  ASSERT_EQ(words[2].word, "$");
+  ASSERT_EQ(words[3].word, "world");
+  ASSERT_EQ(words[4].word, "$");
 }
 
 TEST(AlignTest, getAlignedWordSplits2) {
@@ -41,11 +41,11 @@ TEST(AlignTest, getAlignedWordSplits2) {
                                    "|", "w", "o", "o", "r", "l", "l", "d", "|"};
 
   auto words = getAlignedWords(ltrs, 2);
-  CHECK_EQ(words[0].word, "$");
-  CHECK_EQ(words[1].word, "helllo");
-  CHECK_EQ(words[2].word, "$");
-  CHECK_EQ(words[3].word, "world");
-  CHECK_EQ(words[4].word, "$");
+  ASSERT_EQ(words[0].word, "$");
+  ASSERT_EQ(words[1].word, "helllo");
+  ASSERT_EQ(words[2].word, "$");
+  ASSERT_EQ(words[3].word, "world");
+  ASSERT_EQ(words[4].word, "$");
 }
 
 TEST(AlignTest, trailingWord) {
@@ -54,10 +54,10 @@ TEST(AlignTest, trailingWord) {
                                    "|", "w", "o", "o", "r", "l", "l", "d"};
 
   auto words = getAlignedWords(ltrs, 2);
-  CHECK_EQ(words[0].word, "$");
-  CHECK_EQ(words[1].word, "helllo");
-  CHECK_EQ(words[2].word, "$");
-  CHECK_EQ(words[3].word, "world");
+  ASSERT_EQ(words[0].word, "$");
+  ASSERT_EQ(words[1].word, "helllo");
+  ASSERT_EQ(words[2].word, "$");
+  ASSERT_EQ(words[3].word, "world");
 }
 
 TEST(AlignTest, noBeginningSilence) {
@@ -66,7 +66,7 @@ TEST(AlignTest, noBeginningSilence) {
                                    "w", "o", "o", "r", "l", "l", "d"};
 
   auto words = getAlignedWords(ltrs, 2);
-  CHECK_EQ(words[0].word, "helllo");
-  CHECK_EQ(words[1].word, "$");
-  CHECK_EQ(words[2].word, "world");
+  ASSERT_EQ(words[0].word, "helllo");
+  ASSERT_EQ(words[1].word, "$");
+  ASSERT_EQ(words[2].word, "world");
 }
