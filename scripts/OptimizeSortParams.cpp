@@ -16,9 +16,9 @@
 #include "common/Defines.h"
 #include "common/Utils.h"
 #include "data/NumberedFilesLoader.h"
+#include "data/Sound.h"
 #include "data/Utils.h"
 #include "fb/W2lEverstoreDataset.h"
-#include "feature/Sound.h"
 
 using namespace w2l;
 
@@ -96,7 +96,7 @@ std::vector<SpeechSampleMetaInfo> loadLocal(const std::string& path) {
   for (int64_t i = 0; i < loader.size(); ++i) {
     auto audiofile = loader.filename(i, FLAGS_input);
     auto targetfile = loader.filename(i, FLAGS_target);
-    auto info = speech::loadSoundInfo(audiofile.c_str());
+    auto info = w2l::loadSoundInfo(audiofile.c_str());
     auto durationMs = ((double)info.frames / info.samplerate) * 1e3;
     auto ref = loadTarget(targetfile);
     samples.emplace_back(durationMs, ref.size(), i);
