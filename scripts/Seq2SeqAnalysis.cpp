@@ -68,7 +68,13 @@ int main(int argc, char** argv) {
 
   LOG(INFO) << "Gflags after parsing \n" << serializeGflags("; ");
 
-  Dictionary dict = createTokenDict();
+  Dictionary dict(pathsConcat(FLAGS_tokensdir, FLAGS_tokens));
+  for (int64_t r = 1; r <= FLAGS_replabel; ++r) {
+    dict.addEntry(std::to_string(r));
+  }
+  if (FLAGS_eostoken) {
+    dict.addEntry(kEosToken);
+  }
 
   LOG(INFO) << "Number of classes (network) = " << dict.indexSize();
 

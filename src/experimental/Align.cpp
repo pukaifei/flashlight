@@ -76,8 +76,19 @@ int main(int argc, char** argv) {
   LOG(INFO) << "Gflags after parsing \n" << serializeGflags("; ");
 
   /* ===================== Create Dictionary ===================== */
+  Dictionary tokenDict(FLAGS_tokens);
+  // Setup-specific modifications
+  for (int64_t r = 1; r <= FLAGS_replabel; ++r) {
+    tokenDict.addEntry(std::to_string(r));
+  }
+  // ctc expects the blank label last
+  if (FLAGS_criterion == kCtcCriterion) {
+    tokenDict.addEntry(kBlankToken);
+  }
+  if (FLAGS_eostoken) {
+    tokenDict.addEntry(kEosToken);
+  }
 
-  auto tokenDict = createTokenDict(FLAGS_tokens);
   int numClasses = tokenDict.indexSize();
   LOG(INFO) << "Number of classes (network): " << numClasses;
 
@@ -156,7 +167,7 @@ int main(int argc, char** argv) {
       std::vector<std::string> alignedLetters;
       auto path = bestPaths[b];
       for (auto& p : path) {
-        auto ltr = dicts[kTargetIdx].getToken(p);
+        auto ltr = dicts[kTargetIdx].getEntry(p);
         alignedLetters.emplace_back(ltr);
       }
       auto alignedWords = getAlignedWords(alignedLetters, FLAGS_replabel);

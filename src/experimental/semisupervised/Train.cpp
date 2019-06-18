@@ -72,7 +72,12 @@ int main(int argc, char** argv) {
   LOG_MASTER(INFO) << "Experiment runidx: " << runIdx;
 
   /* ===================== Create Dictionary & Lexicon ===================== */
-  Dictionary dict = createTokenDict();
+  Dictionary dict(FLAGS_tokens);
+  // Setup-specific modifications
+  if (FLAGS_eostoken) {
+    dict.addEntry(kEosToken);
+  }
+
   int numClasses = dict.indexSize();
   dict.setDefaultIndex(numClasses);
   LOG_MASTER(INFO) << "Number of classes (network) = " << numClasses;

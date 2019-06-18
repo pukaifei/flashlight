@@ -19,10 +19,10 @@ namespace w2l {
 Dictionary createFairseqTokenDict(const std::string& filepath) {
   Dictionary dict;
 
-  dict.addToken("<fairseq_style>", 0);
-  dict.addToken("<pad>", 1);
-  dict.addToken(kEosToken, 2);
-  dict.addToken(kUnkToken, 3);
+  dict.addEntry("<fairseq_style>", 0);
+  dict.addEntry("<pad>", 1);
+  dict.addEntry(kEosToken, 2);
+  dict.addEntry(kUnkToken, 3);
 
   if (filepath.empty()) {
     throw std::runtime_error("Empty filepath specified for token dictiinary.");
@@ -39,7 +39,7 @@ Dictionary createFairseqTokenDict(const std::string& filepath) {
     }
     auto tkns = splitOnWhitespace(line, true);
     if (!tkns.empty()) {
-      dict.addToken(tkns[0]);
+      dict.addEntry(tkns[0]);
     }
   }
 
@@ -56,7 +56,7 @@ std::pair<std::vector<int>, int> genTokenDictIndexMap(
   int numPadding = 0;
 
   for (int idx1 = 0; idx1 < size1; ++idx1) {
-    auto token = dict1.getToken(idx1);
+    auto token = dict1.getEntry(idx1);
     auto idx2 = dict2.getIndex(token);
     if (idx2 < size2) {
       mapping[idx1] = idx2;
