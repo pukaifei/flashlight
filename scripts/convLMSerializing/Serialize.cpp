@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
   gflags::SetUsageMessage(
       "Usage: \n " + exec + std::string() +
       " [arc_path] [weight_path] [save_path]" + std::string() +
-      "[outputTokensDim] [0-adaptiveSoftmax/1-CrossEntropy] [0-loadcriterion/1-saveactivatio] {10,20,30} {inputSize}");
+      " [outputTokensDim] [0-adaptiveSoftmax/1-CrossEntropy] [0-loadcriterion/1-saveactivation] {10,20,30} {inputSize}");
   if (argc < 6) {
     LOG(FATAL) << gflags::ProgramUsage();
   }
@@ -49,11 +49,19 @@ int main(int argc, char** argv) {
     for (const auto& val : w2l::splitOnAnyOf(",", argv[7], true)) {
       adaptiveTail.push_back(std::stoi(val));
     }
-    adaptiveTail.push_back(outputTokensDim);
+    if (outputTokensDim > adaptiveTail.back()) {
+      adaptiveTail.push_back(outputTokensDim);
+    } else {
+      if (outputTokensDim < adaptiveTail.back()) {
+        LOG(FATAL) << "[ConvLMSerializer]: cannot specify adaptive softmax tail"
+                   << " larger than vocab size";
+      }
+    }
     inputSizeAdaptiveSoftmax = std::stoi(argv[8]);
     loadActivation = std::stoi(argv[6]);
   }
 
+  LOG(INFO) << "[ConvLMSerializer]: Load convlm model";
   loadConvLM(
       network,
       criterion,

@@ -283,14 +283,19 @@ void loadConvLM(
   }
 
   // Loading weights from the binary file
+  LOG(INFO) << "[LoadConvLM]: Load states";
   auto modelStates = loadModelStates(weightFile);
   LOG_IF(
       FATAL,
       modelStates.size() !=
           network->params().size() +
               (criterion ? criterion->params().size() : 0))
-      << "mismatch between the number of parameters in the arch file and the weight file";
+      << "mismatch between the number of parameters in the arch file and the weight file "
+      << modelStates.size() << " model states vs " << network->params().size()
+      << " nn params + " << (criterion ? criterion->params().size() : 0)
+      << " criterion params";
 
   // Load weight states into network and criterion
+  LOG(INFO) << "[LoadConvLM]: set params";
   setParams(network, criterion, modelStates);
 }
