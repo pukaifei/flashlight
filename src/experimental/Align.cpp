@@ -154,7 +154,7 @@ int main(int argc, char** argv) {
     parseMtr.resume();
 #pragma omp parallel for num_threads(bestPaths.size())
     for (auto b = 0; b < bestPaths.size(); b++) {
-      auto sampleIdsStr = afToVector<std::string>(sample[kSampleIdx]);
+      auto sampleIdsStr = readSampleIds(sample[kSampleIdx]);
       auto rawLtrTarget = afToVector<int>(sample[kTargetIdx]);
       for (auto& t : rawLtrTarget) {
         // ignore padded letter targets
