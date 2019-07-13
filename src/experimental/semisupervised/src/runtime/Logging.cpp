@@ -13,7 +13,7 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-#include "common/Utils.h"
+#include "common/FlashlightUtils.h"
 #include "experimental/semisupervised/src/runtime/Defines.h"
 #include "runtime/Serial.h"
 

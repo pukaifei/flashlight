@@ -17,7 +17,7 @@
 
 #include "common/Defines.h"
 #include "common/Dictionary.h"
-#include "common/Utils.h"
+#include "common/FlashlightUtils.h"
 #include "criterion/criterion.h"
 #include "data/Featurize.h"
 #include "experimental/semisupervised/src/module/LMCritic.h"

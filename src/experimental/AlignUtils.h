@@ -1,7 +1,7 @@
 #include <codecvt>
 #include <locale>
+#include "common/FlashlightUtils.h"
 #include "common/Transforms.h"
-#include "common/Utils.h"
 
 const double msPerFrame = 20;
 

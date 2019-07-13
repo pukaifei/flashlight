@@ -12,8 +12,8 @@
 #include <glog/logging.h>
 
 #include "common/Defines.h"
+#include "common/FlashlightUtils.h"
 #include "common/Transforms.h"
-#include "common/Utils.h"
 #include "criterion/criterion.h"
 #include "data/W2lListFilesDataset.h"
 #include "data/W2lNumberedFilesDataset.h"

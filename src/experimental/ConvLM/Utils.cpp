@@ -2,7 +2,7 @@
 #include <glog/logging.h>
 #include <module/module.h>
 #include <fstream>
-#include "common/Utils-base.h"
+#include "common/FlashlightUtils.h"
 #include "common/Utils.h"
 
 using fl::Variable;

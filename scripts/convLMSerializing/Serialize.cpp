@@ -7,7 +7,7 @@
  */
 #include <glog/logging.h>
 #include <runtime/Serial.h>
-#include "common/Utils-base.h"
+#include "common/Utils.h"
 #include "experimental/ConvLM/Utils.h"
 
 using std::shared_ptr;

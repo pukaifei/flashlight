@@ -9,7 +9,7 @@
 #pragma once
 
 #include <flashlight/flashlight.h>
-#include "common/Utils.h"
+#include "common/FlashlightUtils.h"
 
 #include "criterion/CriterionUtils.h"
 namespace w2l {

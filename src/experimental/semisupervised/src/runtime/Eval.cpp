@@ -11,8 +11,8 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include "common/FlashlightUtils.h"
 #include "common/Transforms.h"
-#include "common/Utils.h"
 #include "experimental/semisupervised/src/runtime/Logging.h"
 
 namespace w2l {

@@ -14,7 +14,7 @@
 #include <glog/logging.h>
 
 #include "common/Defines.h"
-#include "common/Utils.h"
+#include "common/FlashlightUtils.h"
 #include "data/NumberedFilesLoader.h"
 #include "data/Sound.h"
 #include "data/Utils.h"

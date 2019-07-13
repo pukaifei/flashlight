@@ -11,7 +11,7 @@
 #include "experimental/semisupervised/src/runtime/Utils.h"
 
 #include "common/Defines.h"
-#include "common/Utils-base.h"
+#include "common/Utils.h"
 #include "experimental/semisupervised/src/runtime/Defines.h"
 
 namespace w2l {

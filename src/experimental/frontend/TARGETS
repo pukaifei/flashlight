@@ -13,7 +13,7 @@ cpp_library(
         "Utils.h",
     ],
     deps = [
-        "//deeplearning/projects/wav2letter/src/common:deps",
+        "//deeplearning/projects/wav2letter/src/common:common",
     ],
     external_deps = [
         "glog",
