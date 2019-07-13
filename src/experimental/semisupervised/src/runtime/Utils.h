@@ -11,7 +11,7 @@
 #include <string>
 #include <utility>
 
-#include "common/Dictionary.h"
+#include "libraries/common/Dictionary.h"
 
 namespace w2l {
 Dictionary createFairseqTokenDict(const std::string& filepath);

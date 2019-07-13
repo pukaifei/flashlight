@@ -13,8 +13,8 @@
 #include <string>
 #include <unordered_map>
 
-#include "common/Dictionary.h"
 #include "experimental/semisupervised/src/module/LMCritic.h"
+#include "libraries/common/Dictionary.h"
 
 namespace w2l {
 std::unordered_map<std::string, std::string> setFlags(int argc, char** argv);

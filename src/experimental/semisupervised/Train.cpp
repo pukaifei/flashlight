@@ -16,12 +16,12 @@
 #include <glog/logging.h>
 
 #include "common/Defines.h"
-#include "common/Dictionary.h"
 #include "common/FlashlightUtils.h"
 #include "criterion/criterion.h"
 #include "data/Featurize.h"
 #include "experimental/semisupervised/src/module/LMCritic.h"
 #include "experimental/semisupervised/src/runtime/runtime.h"
+#include "libraries/common/Dictionary.h"
 #include "module/module.h"
 #include "runtime/runtime.h"
 

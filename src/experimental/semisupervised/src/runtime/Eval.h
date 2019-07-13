@@ -10,10 +10,10 @@
 
 #include <flashlight/flashlight.h>
 
-#include "common/Dictionary.h"
 #include "criterion/criterion.h"
 #include "data/W2lDataset.h"
 #include "experimental/semisupervised/src/runtime/Logging.h"
+#include "libraries/common/Dictionary.h"
 #include "runtime/runtime.h"
 
 namespace w2l {
