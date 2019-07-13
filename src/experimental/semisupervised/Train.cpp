@@ -147,7 +147,7 @@ int main(int argc, char** argv) {
   }
 
   auto trainEvalIds =
-      randomSubset(FLAGS_seed, pairedDs->size(), FLAGS_pcttraineval);
+      getTrainEvalIds(pairedDs->size(), FLAGS_pcttraineval, FLAGS_seed);
 
   auto validSets = split(',', trim(FLAGS_valid));
   std::unordered_map<std::string, std::shared_ptr<W2lDataset>> validds;

@@ -22,8 +22,7 @@
 #include "data/W2lNumberedFilesDataset.h"
 #include "fb/W2lEverstoreDataset.h"
 #include "module/module.h"
-#include "runtime/Logger.h"
-#include "runtime/Serial.h"
+#include "runtime/runtime.h"
 
 #include "experimental/AlignUtils.h"
 #include "experimental/ForceAlignment.h"
