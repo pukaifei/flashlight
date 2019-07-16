@@ -14,11 +14,12 @@
 #include "common/Defines.h"
 #include "common/FlashlightUtils.h"
 #include "common/Transforms.h"
+#include "common/Utils.h"
 #include "criterion/criterion.h"
 #include "data/W2lListFilesDataset.h"
 #include "data/W2lNumberedFilesDataset.h"
 #include "module/module.h"
-#include "runtime/Serial.h"
+#include "runtime/runtime.h"
 
 using namespace w2l;
 
@@ -121,6 +122,7 @@ int main(int argc, char** argv) {
 
   int uid = 1;
   for (auto& sample : *testset) {
+    auto sampleIds = readSampleIds(sample[kSampleIdx]);
     auto output = network->forward(fl::input(sample[kInputIdx]));
     auto target = sample[kTargetIdx];
     auto tfout = std::get<0>(criterion->decoder(output, fl::noGrad(target)));
@@ -131,6 +133,7 @@ int main(int argc, char** argv) {
     auto loss = criterion->forward({output, fl::noGrad(target)}).front();
     auto lossvec = afToVector<float>(loss.array());
     for (int b = 0; b < output.dims(2); ++b) {
+      auto sampleId = sampleIds[b];
       auto tgt = target(af::span, b);
       auto teacherpath = afToVector<int>(argmaxid(af::span, af::span, b));
       auto tgtraw = afToVector<int>(tgt);
@@ -176,7 +179,7 @@ int main(int argc, char** argv) {
         cerMeter_single.reset();
         cerMeter_single.add(viterbipathLtr, tgtrawLtr);
 
-        std::cout << "UID: " << uid << ", " << metername
+        std::cout << uid << ": " << sampleId << ", " << metername
                   << cerMeter_single.value()[0]
                   << ", DEL: " << cerMeter_single.value()[2]
                   << ", INS: " << cerMeter_single.value()[3]
@@ -197,11 +200,12 @@ int main(int argc, char** argv) {
       }
 
       if (FLAGS_attndir != "") {
-        auto filename = FLAGS_attndir + "/" + std::to_string(uid) + "_attn.out";
-        std::string key(std::to_string(uid));
+        auto filename = FLAGS_attndir + "/" + sampleId + "_attn.out";
+        std::string key(sampleId);
+        auto viterbipathToken = wrdIdx2Wrd(viterbipath, dict);
         std::for_each(
-            viterbipathLtr.begin(),
-            viterbipathLtr.end(),
+            viterbipathToken.begin(),
+            viterbipathToken.end(),
             [&](const std::string& s) { key += ("-" + s); });
         key += "-<eos>";
         af::saveArray(key.c_str(), attention.array(), filename.c_str(), false);
