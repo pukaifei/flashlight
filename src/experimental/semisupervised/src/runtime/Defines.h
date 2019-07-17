@@ -69,5 +69,6 @@ DECLARE_string(lmadasoftmaxcutoff);
 DECLARE_int64(lmadasoftmaxinputdim);
 DECLARE_int64(lmtempstepsize);
 DECLARE_string(unpairedSampling);
+DECLARE_bool(lmmaskpadding);
 
 } // namespace w2l

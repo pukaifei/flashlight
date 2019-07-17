@@ -72,7 +72,11 @@ int main(int argc, char** argv) {
   LOG_MASTER(INFO) << "Experiment runidx: " << runIdx;
 
   /* ===================== Create Dictionary & Lexicon ===================== */
-  Dictionary dict(FLAGS_tokens);
+  auto dictPath = pathsConcat(FLAGS_tokensdir, FLAGS_tokens);
+  if (dictPath.empty() || !fileExists(dictPath)) {
+    throw std::runtime_error("Invalid dictionary filepath specified.");
+  }
+  Dictionary dict(dictPath);
   // Setup-specific modifications
   if (FLAGS_eostoken) {
     dict.addEntry(kEosToken);
@@ -287,7 +291,20 @@ int main(int argc, char** argv) {
           loss = s2sLoss;
         } else {
           meters.timer[kLMCritFwdTimer].resume();
-          auto lmcritLoss = lmcrit->forward({s2sLogProb}).front();
+          fl::Variable lmcritLoss;
+          if (FLAGS_lmmaskpadding) {
+            // oracle version: define utterance length from the ground truth
+            // transcription
+            af::array uttLength =
+                sum(sample[kTargetIdx] != dicts[kTargetIdx].getIndex(kEosToken),
+                    0)
+                    .as(af::dtype::s32) +
+                1;
+            lmcritLoss =
+                lmcrit->forward({s2sLogProb, fl::noGrad(uttLength)}).front();
+          } else {
+            lmcritLoss = lmcrit->forward({s2sLogProb}).front();
+          }
           af::sync();
           meters.timer[kLMCritFwdTimer].stopAndIncUnit();
 

@@ -24,6 +24,14 @@ class LMCritic : public fl::Container {
       int startIndex,
       int unkIndex = -1);
 
+  /* forward() can handle two types of inputs:
+   * 1. single Variable --
+   *    inputs[0]: log prob, a Variable with size [nClass, targetlen, batchsize]
+   * 2. two Variables --
+   *    inputs[0]: log prob, a Variable with size [nClass, targetlen, batchsize]
+   *    inputs[1]: length of each sample used for masking, a Variable with
+   *               length [batchsize]
+   */
   std::vector<fl::Variable> forward(
       const std::vector<fl::Variable>& inputs) override;
 

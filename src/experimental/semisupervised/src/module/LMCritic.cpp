@@ -29,7 +29,7 @@ LMCritic::LMCritic(
 }
 
 std::vector<Variable> LMCritic::forward(const std::vector<Variable>& inputs) {
-  if (inputs.size() != 1) {
+  if (inputs.size() > 2) {
     throw std::invalid_argument("Invalid inputs size");
   }
 
@@ -43,9 +43,9 @@ std::vector<Variable> LMCritic::forward(const std::vector<Variable>& inputs) {
 
   probInput = preprocessInput(probInput);
 
-  // pad start token
   Variable lmInput = tile(startProb_, {1, 1, B});
   if (U > 1) {
+    // pad start token
     lmInput = concatenate(
         {lmInput, probInput(af::span, af::seq(0, U - 2), af::span)}, 1);
   }
@@ -53,7 +53,18 @@ std::vector<Variable> LMCritic::forward(const std::vector<Variable>& inputs) {
   auto logProbOutput = lmNetwork()->forward({lmInput}).front();
 
   // cross entropy loss
-  auto losses = negate(flat(sum(probInput * logProbOutput, {0, 1})));
+  Variable losses = probInput * logProbOutput;
+  if (inputs.size() == 2) { // mask padding
+    // [1, B]
+    auto endIdx = inputs[1].array();
+    af::array i1 = af::range(af::dim4(losses.dims(0), U, B), 1);
+    af::array i2 = tile(
+        af::moddims(endIdx, af::dim4(1, 1, B)), af::dim4(losses.dims(0), U, 1));
+    auto mask = (i1 < i2);
+    losses = noGrad(mask) * losses;
+  }
+
+  losses = negate(flat(sum(losses, {0, 1})));
   return {losses, logProbOutput};
 }
 
@@ -102,7 +113,6 @@ Variable LMCritic::preprocessInput(Variable input) {
           },
           0);
     }
-    result(unkIndex_, af::span, af::span) = unkProb;
   } else {
     result = result / tile(sum(result, {0}), {result.dims(0), 1, 1});
   }

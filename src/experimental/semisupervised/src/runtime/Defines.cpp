@@ -52,5 +52,9 @@ DEFINE_string(
     unpairedSampling,
     kModelSampling,
     "Sampling strategy to use on unpaired audio (model, gumbel)");
+DEFINE_bool(
+    lmmaskpadding,
+    false,
+    "mask out the end of sentence padding when computing lmcritic loss");
 
 } // namespace w2l
