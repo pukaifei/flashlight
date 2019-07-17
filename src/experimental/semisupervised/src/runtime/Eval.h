@@ -20,7 +20,7 @@ namespace w2l {
 void evalOutput(
     const af::array& op,
     const af::array& target,
-    fl::EditDistanceMeter& mtr,
+    std::map<std::string, fl::EditDistanceMeter>& mtr,
     const Dictionary& tgtDict,
     std::shared_ptr<SequenceCriterion> criterion);
 

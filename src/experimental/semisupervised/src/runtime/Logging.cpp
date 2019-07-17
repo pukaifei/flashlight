@@ -148,8 +148,6 @@ std::string LogHelper::formatStatus(
     bool date /* = false */,
     const std::string& separator /* = " " */,
     bool headerOnly /* = false */) {
-  std::string errtype = "XER";
-  errtype[0] = std::toupper(FLAGS_target[0]);
   std::string header, status;
 
   auto insertItem = [&](std::string key, std::string val) {
@@ -160,7 +158,7 @@ std::string LogHelper::formatStatus(
     status = status + (status.empty() ? "" : separator) + val;
   };
 
-  auto insertSSLDatasetMeters = [&insertItem, &errtype](
+  auto insertSSLDatasetMeters = [&insertItem](
                                     SSLDatasetMeters& meter, std::string tag) {
     for (auto& m : meter.losses) {
       insertItem(
@@ -168,8 +166,7 @@ std::string LogHelper::formatStatus(
     }
     for (auto& m : meter.edits) {
       insertItem(
-          tag + "-" + m.first + "-" + errtype,
-          format("%5.2f", m.second.value()[0]));
+          tag + "-" + m.first + "ER", format("%5.2f", m.second.value()[0]));
     }
   };
 

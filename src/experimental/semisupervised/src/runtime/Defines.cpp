@@ -30,6 +30,10 @@ DEFINE_string(
     schedulerorder,
     kUniformOrder,
     "the access order between the datasets in the data scheduler (uniform, inorder, random)");
+DEFINE_int64(
+    audiobatchsize,
+    0,
+    "Batch size for the unpaired audio training data");
 
 // lmcrit
 DEFINE_string(lmdict, "", "Dictionary used in LM training");

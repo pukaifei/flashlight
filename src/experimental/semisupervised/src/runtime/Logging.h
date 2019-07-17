@@ -26,7 +26,8 @@ struct SSLDatasetMeters {
   std::map<std::string, fl::AverageValueMeter> losses;
 
   SSLDatasetMeters()
-      : edits({{kTarget, fl::EditDistanceMeter()}}),
+      : edits({{kTarget, fl::EditDistanceMeter()},
+               {kWord, fl::EditDistanceMeter()}}),
         losses({{kASR, fl::AverageValueMeter()},
                 {kLM, fl::AverageValueMeter()},
                 {kFullModel, fl::AverageValueMeter()}}) {}

@@ -25,7 +25,8 @@ constexpr const char* kStartIter = "startIter";
 constexpr const char* kForkAMMode = "forkam";
 
 // meter
-constexpr const char* kTarget = "target";
+constexpr const char* kTarget = "L";
+constexpr const char* kWord = "W";
 constexpr const char* kASR = "asr";
 constexpr const char* kLM = "lm";
 constexpr const char* kFullModel = "fullModel";
@@ -59,6 +60,7 @@ DECLARE_int64(pairediter);
 DECLARE_int64(audioiter);
 DECLARE_int64(audiowarmupepochs);
 DECLARE_string(schedulerorder);
+DECLARE_int64(audiobatchsize);
 
 // lmcrit
 DECLARE_string(lmdict);

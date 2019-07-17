@@ -142,7 +142,12 @@ int main(int argc, char** argv) {
   auto pairedDs = createDataset(
       FLAGS_train, dicts, lexicon, FLAGS_batchsize, worldRank, worldSize);
   auto unpairedAudioDs = createDataset(
-      FLAGS_trainaudio, dicts, lexicon, FLAGS_batchsize, worldRank, worldSize);
+      FLAGS_trainaudio,
+      dicts,
+      lexicon,
+      FLAGS_audiobatchsize == 0 ? FLAGS_batchsize : FLAGS_audiobatchsize,
+      worldRank,
+      worldSize);
 
   if (FLAGS_noresample) {
     LOG_MASTER(INFO) << "Shuffling trainset";
@@ -325,7 +330,7 @@ int main(int argc, char** argv) {
             evalOutput(
                 output.array(),
                 sample[kTargetIdx],
-                meters.train.edits[kTarget],
+                meters.train.edits,
                 dicts[kTargetIdx],
                 criterion);
           }
@@ -346,10 +351,10 @@ int main(int argc, char** argv) {
 
         // scale down gradients by batchsize
         for (const auto& p : network->params()) {
-          p.grad() = p.grad() / FLAGS_batchsize;
+          p.grad() = p.grad() / sample[kInputIdx].dims(3);
         }
         for (const auto& p : criterion->params()) {
-          p.grad() = p.grad() / FLAGS_batchsize;
+          p.grad() = p.grad() / sample[kInputIdx].dims(3);
         }
         if (FLAGS_maxgradnorm > 0) {
           auto params = network->params();

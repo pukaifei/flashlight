@@ -20,7 +20,7 @@ namespace w2l {
 void evalOutput(
     const af::array& op,
     const af::array& target,
-    fl::EditDistanceMeter& mtr,
+    std::map<std::string, fl::EditDistanceMeter>& mtr,
     const Dictionary& tgtDict,
     std::shared_ptr<SequenceCriterion> criterion) {
   auto batchsz = op.dims(2);
@@ -35,8 +35,11 @@ void evalOutput(
 
     auto ltrPred = tknPrediction2Ltr(viterbipath, tgtDict);
     auto ltrTgt = tknTarget2Ltr(tgtraw, tgtDict);
+    auto wrdPred = tkn2Wrd(ltrPred);
+    auto wrdTgt = tkn2Wrd(ltrTgt);
 
-    mtr.add(ltrPred, ltrTgt);
+    mtr[kTarget].add(ltrPred, ltrTgt);
+    mtr[kWord].add(wrdPred, wrdTgt);
   }
 }
 
@@ -59,8 +62,7 @@ void evalDataset(
     mtrs.losses[kLM].add(lmcritLoss.array());
     mtrs.losses[kFullModel].add(loss.array());
 
-    evalOutput(
-        output.array(), sample[kTargetIdx], mtrs.edits[kTarget], dict, crit);
+    evalOutput(output.array(), sample[kTargetIdx], mtrs.edits, dict, crit);
   }
 }
 
