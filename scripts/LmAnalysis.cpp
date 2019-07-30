@@ -16,8 +16,10 @@
 
 #include "common/Defines.h"
 #include "common/Utils.h"
+#include "libraries/lm/ConvLM.h"
 #include "libraries/lm/KenLM.h"
-#include "lm/ConvLM.h"
+#include "module/module.h"
+#include "runtime/runtime.h"
 
 namespace {
 DEFINE_bool(
@@ -154,8 +156,17 @@ int main(int argc, char** argv) {
     }
   } else if (FLAGS_lmtype == "convlm") {
     af::setDevice(0);
+    std::shared_ptr<fl::Module> convLmModel;
+    W2lSerializer::load(FLAGS_lm, convLmModel);
+    convLmModel->eval();
+
+    auto getConvLmScoreFunc = buildGetConvLmScoreFunction(convLmModel);
     lm = std::make_shared<ConvLM>(
-        FLAGS_lm, FLAGS_lm_vocab, usrDict, FLAGS_lm_memory, FLAGS_beamsize);
+        getConvLmScoreFunc,
+        FLAGS_lm_vocab,
+        usrDict,
+        FLAGS_lm_memory,
+        FLAGS_beamsize);
   } else {
     throw std::runtime_error(
         "[LM constructing] Invalid LM Type: " + FLAGS_lmtype);
