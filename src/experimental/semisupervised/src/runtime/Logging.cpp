@@ -213,7 +213,7 @@ std::string LogHelper::formatStatus(
 
   double audioProcSec = isztotal * FLAGS_batchsize;
   if (FLAGS_pow || FLAGS_mfcc || FLAGS_mfsc) {
-    audioProcSec = audioProcSec * kFrameStrideMs / 1000.0;
+    audioProcSec = audioProcSec * FLAGS_framestridems / 1000.0;
   } else {
     audioProcSec /= FLAGS_samplerate;
   }

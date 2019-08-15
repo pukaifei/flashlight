@@ -45,7 +45,7 @@ std::pair<int, int> getPaddingStats(
       input_max = std::max(s.audiolength(), input_max);
       input_min = std::min(s.audiolength(), input_min);
     }
-    auto input_diff_frames = (input_max - input_min) / kFrameStrideMs;
+    auto input_diff_frames = (input_max - input_min) / FLAGS_framestridems;
     input_pad += input_diff_frames * batchsize;
     output_pad += (output_max - output_min) * batchsize;
   }
