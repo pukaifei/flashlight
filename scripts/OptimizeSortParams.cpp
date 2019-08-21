@@ -15,7 +15,6 @@
 
 #include "common/Defines.h"
 #include "common/FlashlightUtils.h"
-#include "data/NumberedFilesLoader.h"
 #include "data/Sound.h"
 #include "data/Utils.h"
 #include "fb/W2lEverstoreDataset.h"
@@ -89,19 +88,9 @@ std::vector<SpeechSampleMetaInfo> loadEverstore(const std::string& path) {
 }
 
 std::vector<SpeechSampleMetaInfo> loadLocal(const std::string& path) {
-  TargetExtMap targetexts;
-  targetexts.insert({kTargetIdx, FLAGS_target});
-  NumberedFilesLoader loader(path, FLAGS_input, targetexts);
-  std::vector<SpeechSampleMetaInfo> samples;
-  for (int64_t i = 0; i < loader.size(); ++i) {
-    auto audiofile = loader.filename(i, FLAGS_input);
-    auto targetfile = loader.filename(i, FLAGS_target);
-    auto info = w2l::loadSoundInfo(audiofile);
-    auto durationMs = ((double)info.frames / info.samplerate) * 1e3;
-    auto ref = loadTarget(targetfile);
-    samples.emplace_back(durationMs, ref.size(), i);
-  }
-  return samples;
+  throw std::domain_error(
+      "loading from numbered files dataset is no longer supported.");
+  return {};
 }
 
 int main(int argc, char** argv) {

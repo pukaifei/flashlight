@@ -17,7 +17,6 @@
 #include "common/Utils.h"
 #include "criterion/criterion.h"
 #include "data/W2lListFilesDataset.h"
-#include "data/W2lNumberedFilesDataset.h"
 #include "module/module.h"
 #include "runtime/runtime.h"
 
@@ -96,15 +95,11 @@ int main(int argc, char** argv) {
   dicts.insert({kTargetIdx, dict});
 
   std::shared_ptr<W2lDataset> testset;
-  if (FLAGS_listdata) {
-    auto lexicon = loadWords(FLAGS_lexicon, FLAGS_maxword);
 
-    testset = std::make_shared<W2lListFilesDataset>(
-        dataset, dicts, lexicon, FLAGS_batchsize, 0, 1, true, true);
-  } else {
-    testset = std::make_shared<W2lNumberedFilesDataset>(
-        dataset, dicts, FLAGS_batchsize, 0, 1, FLAGS_datadir);
-  }
+  auto lexicon = loadWords(FLAGS_lexicon, FLAGS_maxword);
+
+  testset = std::make_shared<W2lListFilesDataset>(
+      dataset, dicts, lexicon, FLAGS_batchsize, 0, 1, true, true);
 
   auto toString = [](const std::vector<std::string>& transcript) {
     std::stringstream ss;

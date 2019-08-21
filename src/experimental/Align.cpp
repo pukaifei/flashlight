@@ -18,7 +18,6 @@
 #include "criterion/criterion.h"
 #include "data/Featurize.h"
 #include "data/W2lDataset.h"
-#include "data/W2lNumberedFilesDataset.h"
 #include "fb/W2lEverstoreDataset.h"
 #include "libraries/common/Dictionary.h"
 #include "module/module.h"
@@ -110,9 +109,10 @@ int main(int argc, char** argv) {
   int worldRank = 0;
   int worldSize = 1;
   std::shared_ptr<W2lDataset> ds;
+  LexiconMap dummyLexicon;
   if (FLAGS_everstoredb) {
     W2lEverstoreDataset::init(); // Required for everstore client
-    LexiconMap dummyLexicon;
+
     ds = std::make_shared<W2lEverstoreDataset>(
         FLAGS_test,
         dicts,
@@ -124,12 +124,15 @@ int main(int argc, char** argv) {
         false /* skipUnk */,
         FLAGS_datadir);
   } else {
-    ds = std::make_shared<W2lNumberedFilesDataset>(
+    ds = std::make_shared<W2lListFilesDataset>(
         FLAGS_test,
         dicts,
+        dummyLexicon,
         FLAGS_batchsize,
         worldRank,
         worldSize,
+        true /* fallback2Ltr */,
+        false /* skipUnk */,
         FLAGS_datadir);
   }
 
