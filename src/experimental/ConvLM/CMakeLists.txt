@@ -25,3 +25,15 @@ target_include_directories(
   INTERFACE
   ${GLOG_INCLUDE_DIRS}
   )
+
+# ----------------------------- Serialize -----------------------------
+add_executable(
+  Serialize
+	Serialize.cpp
+)
+
+target_link_libraries(
+  Serialize
+  wav2letter++_ss
+)
+
