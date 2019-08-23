@@ -30,7 +30,7 @@ using namespace w2l;
 
 
 /* meters for memory tracing */
-std::map<std::string, std::vector<size_t>> 
+std::map<std::string, std::vector<size_t>>
   memMeters({{"0-start", {0, 0, 0, 0}},
              {"1-encfwd", {0, 0, 0, 0}},
              {"2a-decfwd", {0, 0, 0, 0}},
@@ -54,7 +54,7 @@ std::string sprintMemStat(bool buff=true) {
   std::ostringstream os;
   size_t offset = buff ? 1 : 0;
   for (auto& m : memMeters) {
-    os << m.first << ":" << m.second[2+offset] 
+    os << m.first << ":" << m.second[2+offset]
        << "/" << m.second[offset] << " ";
   }
   return os.str();
@@ -344,13 +344,13 @@ int main(int argc, char** argv) {
         }
 
         if (FLAGS_debug) {
-          LOG(INFO) << "[ Epoch " << curEpoch << " ]" 
+          LOG(INFO) << "[ Epoch " << curEpoch << " ]"
                     << " Iter=" << scheduleIter
                     << " isPairedData=" << isPairedData
                     << " Inp-T=" << sample[kInputIdx].dims()[0]
                     << " Out-U=" << sample[kTargetIdx].dims()[0];
         } else {
-          LOG_MASTER(INFO) << "[ Epoch " << curEpoch << " ]" 
+          LOG_MASTER(INFO) << "[ Epoch " << curEpoch << " ]"
                            << " Iter=" << scheduleIter
                            << " isPairedData=" << isPairedData
                            << " Inp-T=" << sample[kInputIdx].dims()[0]
@@ -371,7 +371,7 @@ int main(int argc, char** argv) {
         }
         resetMemStat();
         updateMemStat("0-start");
-        
+
         // forward
         meters.timer[kFwdTimer].resume();
         auto output = network->forward({fl::input(sample[kInputIdx])}).front();
@@ -386,7 +386,7 @@ int main(int argc, char** argv) {
           loss = criterion->forward(
               {output, fl::noGrad(sample[kTargetIdx])}).front();
           updateMemStat("2a-decfwd");
-          
+
           if (af::anyTrue<bool>(af::isNaN(loss.array()))) {
             LOG(FATAL) << "ASR loss has NaN values";
           }
@@ -397,23 +397,23 @@ int main(int argc, char** argv) {
           loss = criterion->forward(
               {output, fl::noGrad(sample[kTargetIdx])}).front();
           updateMemStat("2a-decfwd");
-          
+
           if (af::anyTrue<bool>(af::isNaN(loss.array()))) {
             LOG(FATAL) << "ASR loss has NaN values";
           }
           meters.train.losses[kLM].add(loss.array());
-          meters.timer[kBeamFwdTimer].stopAndIncUnit();         
+          meters.timer[kBeamFwdTimer].stopAndIncUnit();
         } else {
           fl::Variable lmLogprob, procLmLogprob;
           meters.timer[kBeamTimer].resume();
-          
-          auto propoutput = 
+
+          auto propoutput =
               propnet->forward({fl::input(sample[kInputIdx])}).front();
-          std::tie(paths, hypoNums) = batchBeamSearch(propoutput, propcrit);
-         
+          std::tie(paths, hypoNums) = batchBeamSearch(propoutput, propcrit, dicts[kTargetIdx].getIndex(kEosToken));
+
           meters.timer[kBeamTimer].stopAndIncUnit();
           updateMemStat("2b-decbs");
-          
+
           // Reduce batchsize by removing ones with empty hypotheses
           if (FLAGS_debug) {
             LOG(INFO) << "(ori) hypo nums=" << stringify<int>(hypoNums)
@@ -457,7 +457,7 @@ int main(int argc, char** argv) {
             }
             meters.timer[kLMCritFwdTimer].stopAndIncUnit();
             updateMemStat("3-lmfwd");
-            
+
             meters.timer[kBeamFwdTimer].resume();
             auto s2sLogprob = computeS2SLogprob(
                 paths, hypoNums, output, criterion, dicts[kTargetIdx]);
@@ -486,32 +486,32 @@ int main(int argc, char** argv) {
                         << af::toString("S2S prob entropy : ", s2sent.array(), 4, false)
                         << af::toString("PM loss", loss.array(), 4, false)
                         << std::endl;
-              
+
               LOG(INFO) << "===== PATHS ====";
               for (auto& path : paths) {
                 auto wrdVec = wrdIdx2Wrd(path, dicts[kTargetIdx]);
-                LOG(INFO) << stringify<std::string>(wrdVec); 
+                LOG(INFO) << stringify<std::string>(wrdVec);
               }
-          
+
               std::vector<std::vector<int>> onlinePaths;
               std::vector<int> onlineHypoNums;
 
               LOG(INFO) << "===== PATHS from online model ====";
-              std::tie(onlinePaths, onlineHypoNums) = 
-                batchBeamSearch(output, criterion);
+              std::tie(onlinePaths, onlineHypoNums) =
+                batchBeamSearch(output, criterion, dicts[kTargetIdx].getIndex(kEosToken));
               for (auto& path : onlinePaths) {
                 auto wrdVec = wrdIdx2Wrd(path, dicts[kTargetIdx]);
-                LOG(INFO) << stringify<std::string>(wrdVec); 
+                LOG(INFO) << stringify<std::string>(wrdVec);
               }
 
               LOG(INFO) << "===== PATHS from online encoder ====";
-              std::tie(onlinePaths, onlineHypoNums) = 
-                batchBeamSearch(output, propcrit);
+              std::tie(onlinePaths, onlineHypoNums) =
+                batchBeamSearch(output, propcrit, dicts[kTargetIdx].getIndex(kEosToken));
               for (auto& path : onlinePaths) {
                 auto wrdVec = wrdIdx2Wrd(path, dicts[kTargetIdx]);
-                LOG(INFO) << stringify<std::string>(wrdVec); 
+                LOG(INFO) << stringify<std::string>(wrdVec);
               }
- 
+
             }
 
             for (auto& path : paths) {
@@ -552,7 +552,7 @@ int main(int argc, char** argv) {
         netoptim->zeroGrad();
         lmcrit->zeroGrad();
         updateMemStat("5-zgrad");
-        
+
         loss.backward();
         if (reducer) {
           reducer->finalize();
@@ -592,7 +592,7 @@ int main(int argc, char** argv) {
         meters.timer[kSampleTimer].resume();
 
         auto lengths = getLengths<int, int>(paths);
-        LOG_MASTER(INFO) << "[ Epoch " << curEpoch << " ]" 
+        LOG_MASTER(INFO) << "[ Epoch " << curEpoch << " ]"
                          << " Iter=" << scheduleIter
                          << " isPairedData=" << isPairedData
                          << " AvgLoss=" << fl::mean(loss, {0}).scalar<float>()
@@ -626,15 +626,15 @@ int main(int argc, char** argv) {
 
           // maybe update proposal network
           double newproperr = avgValidErr(meters);
-          LOG(INFO) << "ProposalNetwork:" 
-                    << " new=" << newproperr 
+          LOG(INFO) << "ProposalNetwork:"
+                    << " new=" << newproperr
                     << " old=" << properr;
-          if ((FLAGS_propupdate == kAlways) || 
+          if ((FLAGS_propupdate == kAlways) ||
               (FLAGS_propupdate == kBetter && properr > newproperr)) {
             LOG(INFO) << "Update proposal model to the current model";
             logHelper.saveProposalModel(config, network, criterion);
             properr = newproperr;
-            
+
             // TODO: better method for loading the best model to the proposal model?
             std::string workerPropPath = logHelper.saveWorkerProposalModel(
                 config, network, criterion, worldRank);

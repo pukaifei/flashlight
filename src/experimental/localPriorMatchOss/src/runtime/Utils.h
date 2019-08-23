@@ -48,11 +48,12 @@ std::vector<S> getLengths(const std::vector<std::vector<T>>& vec);
 af::array getTargetLength(af::array& target, int eosIdx);
 
 std::pair<std::vector<std::vector<int>>, std::vector<int>> batchBeamSearch(
-    const fl::Variable& output, 
-    const std::shared_ptr<Seq2SeqCriterion>& criterion);
+    const fl::Variable& output,
+    const std::shared_ptr<Seq2SeqCriterion>& criterion,
+    int eos);
 
 std::pair<std::vector<std::vector<int>>, std::vector<int>> filterBeamByLength(
-    const std::vector<std::vector<int>>& paths, 
+    const std::vector<std::vector<int>>& paths,
     const std::vector<int>& hypoNums,
     const std::vector<int>& refLengths);
 
@@ -82,8 +83,8 @@ fl::Variable variableMax(
     const fl::Variable& var, const std::vector<int>& sizes, bool tile=false);
 
 fl::Variable computePriorMatchingLoss(
-    const fl::Variable& lmLogprob, 
-    const fl::Variable& s2sLogprob, 
+    const fl::Variable& lmLogprob,
+    const fl::Variable& s2sLogprob,
     const std::vector<int>& hypoNums);
 
 af::array batchTarget(

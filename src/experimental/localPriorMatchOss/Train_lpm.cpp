@@ -309,7 +309,7 @@ int main(int argc, char** argv) {
             af::anyTrue<bool>(af::isNaN(sample[kTargetIdx]))) {
           LOG(FATAL) << "Sample has NaN values";
         }
-        
+
         // forward
         meters.timer[kFwdTimer].resume();
         auto output = network->forward({fl::input(sample[kInputIdx])}).front();
@@ -321,7 +321,7 @@ int main(int argc, char** argv) {
           meters.timer[kCritFwdTimer].resume();
           loss = criterion->forward(
               {output, fl::noGrad(sample[kTargetIdx])}).front();
-          
+
           if (af::anyTrue<bool>(af::isNaN(loss.array()))) {
             LOG(FATAL) << "ASR loss has NaN values";
           }
@@ -330,11 +330,11 @@ int main(int argc, char** argv) {
         } else {
           fl::Variable lmLogprob;
           meters.timer[kBeamTimer].resume();
-          auto propoutput = 
+          auto propoutput =
               propnet->forward({fl::input(sample[kInputIdx])}).front();
-          std::tie(paths, hypoNums) = batchBeamSearch(propoutput, propcrit);
+          std::tie(paths, hypoNums) = batchBeamSearch(propoutput, propcrit, dicts[kTargetIdx].getIndex(kEosToken));
           meters.timer[kBeamTimer].stopAndIncUnit();
-          
+
           auto refLen = afToVector<int>(getTargetLength(
               sample[kTargetIdx], dicts[kTargetIdx].getIndex(kEosToken)));
           std::tie(paths, hypoNums) = filterBeamByLength(paths, hypoNums, refLen);
@@ -356,7 +356,7 @@ int main(int argc, char** argv) {
             meters.timer[kLMCritFwdTimer].resume();
             lmLogprob = computeLmLogprob(paths, lmcrit, dicts[kTargetIdx]);
             meters.timer[kLMCritFwdTimer].stopAndIncUnit();
-            
+
             meters.timer[kBeamFwdTimer].resume();
             auto s2sLogprob = computeS2SLogprob(
                 paths, hypoNums, output, criterion, dicts[kTargetIdx]);
@@ -401,7 +401,7 @@ int main(int argc, char** argv) {
         meters.timer[kBwdTimer].resume();
         netoptim->zeroGrad();
         lmcrit->zeroGrad();
-        
+
         loss.backward();
         if (reducer) {
           reducer->finalize();
@@ -440,7 +440,7 @@ int main(int argc, char** argv) {
         meters.timer[kSampleTimer].resume();
 
         auto lengths = getLengths<int, int>(paths);
-        LOG_MASTER(INFO) << "[ Epoch " << curEpoch << " ]" 
+        LOG_MASTER(INFO) << "[ Epoch " << curEpoch << " ]"
                          << " Iter=" << scheduleIter
                          << " isPairedData=" << isPairedData
                          << " AvgLoss=" << fl::mean(loss, {0}).scalar<float>()
@@ -473,15 +473,15 @@ int main(int argc, char** argv) {
 
           // maybe update proposal network
           double newproperr = avgValidErr(meters);
-          LOG(INFO) << "ProposalNetwork:" 
-                    << " new=" << newproperr 
+          LOG(INFO) << "ProposalNetwork:"
+                    << " new=" << newproperr
                     << " old=" << properr;
-          if ((FLAGS_propupdate == kAlways) || 
+          if ((FLAGS_propupdate == kAlways) ||
               (FLAGS_propupdate == kBetter && properr > newproperr)) {
             LOG(INFO) << "Update proposal model to the current model";
             logHelper.saveProposalModel(config, network, criterion);
             properr = newproperr;
-            
+
             // TODO: better method for loading the best model to the proposal model?
             std::string workerPropPath = logHelper.saveWorkerProposalModel(
                 config, network, criterion, worldRank);
