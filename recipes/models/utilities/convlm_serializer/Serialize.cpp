@@ -8,7 +8,7 @@
 #include <glog/logging.h>
 #include <runtime/Serial.h>
 #include "common/Utils.h"
-#include "experimental/ConvLM/Utils.h"
+#include "recipes/models/utilities/convlm_serializer/Utils.h"
 
 using std::shared_ptr;
 using std::string;
@@ -19,9 +19,9 @@ int main(int argc, char** argv) {
   string exec(argv[0]);
   vector<string> argvs;
   gflags::SetUsageMessage(
-      "Usage: \n " + exec + std::string() +
-      " [arc_path] [weight_path] [save_path]" + std::string() +
-      " [outputTokensDim] [0-adaptiveSoftmax/1-CrossEntropy] [0-loadcriterion/1-saveactivation] {10,20,30} {inputSize}");
+      "Serializer of ConvLM from fairseq package. Usage: \n " + exec +
+      std::string() + " [arc_path] [weight_path] [save_path]" + std::string() +
+      " [outputTokensDim] [0-adaptiveSoftmax/1-CrossEntropy] [0-loadCriterion/1-saveActivation] {10,20,30} {inputSize}");
   if (argc < 6) {
     LOG(FATAL) << gflags::ProgramUsage();
   }
@@ -85,19 +85,6 @@ int main(int argc, char** argv) {
     criterion->eval();
   }
 
-  vector<int> input = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-  af::array d_input(10, input.data());
-  LOG(INFO) << "[ConvLMSerializer]: Check simple forward";
-
-  auto output = network->forward({fl::input(d_input)})[0];
-  af_print(output.array().rows(0, 5));
-  if (criterion != nullptr) {
-    output = std::dynamic_pointer_cast<fl::AdaptiveSoftMaxLoss>(criterion)
-                 ->getActivation()
-                 ->forward(output);
-    af_print(output.array().rows(0, 5));
-  }
-  LOG(INFO) << "[ConvLMSerializer]: Finished simple forward";
   LOG(INFO) << "[ConvLMSerializer]: Saving into file " << savePath;
   w2l::W2lSerializer::save(savePath, network, criterion);
 

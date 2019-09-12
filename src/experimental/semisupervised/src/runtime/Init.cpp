@@ -15,9 +15,9 @@
 #include <glog/logging.h>
 
 #include "common/FlashlightUtils.h"
-#include "experimental/ConvLM/Utils.h"
 #include "experimental/semisupervised/src/runtime/Defines.h"
 #include "experimental/semisupervised/src/runtime/Utils.h"
+#include "recipes/models/utilities/convlm_serializer/Utils.h"
 #include "runtime/Serial.h"
 
 namespace w2l {

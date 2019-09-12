@@ -19,7 +19,7 @@ target_link_libraries(
   wav2letter++
   module_ss    # semisupervised-specific
   runtime_ss   # semisupervised-specific
-  convlm-experimental # see src/experimental/ConvLM
+  convlm-serializer # see src/experimental/ConvLM
   )
 
 # ------------------------- Dedicated SSL Train executable --------------------------

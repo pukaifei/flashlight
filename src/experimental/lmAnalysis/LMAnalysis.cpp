@@ -16,8 +16,6 @@
 #include "common/Transforms.h"
 #include "common/Utils.h"
 #include "criterion/criterion.h"
-#include "data/W2lListFilesDataset.h"
-#include "data/W2lNumberedFilesDataset.h"
 #include "module/module.h"
 #include "runtime/Serial.h"
 #include "experimental/localPriorMatch/src/runtime/Defines.h"

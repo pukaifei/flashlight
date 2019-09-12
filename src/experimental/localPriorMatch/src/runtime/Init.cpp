@@ -15,13 +15,14 @@
 #include <glog/logging.h>
 
 #include "common/FlashlightUtils.h"
-#include "experimental/ConvLM/Utils.h"
 #include "experimental/localPriorMatch/src/runtime/Defines.h"
 #include "experimental/localPriorMatch/src/runtime/Utils.h"
+#include "recipes/models/utilities/convlm_serializer/Utils.h"
 #include "runtime/Serial.h"
 
 namespace w2l {
-std::unordered_map<std::string, std::string> setFlags(int argc, char** argv, bool hasprop) {
+std::unordered_map<std::string, std::string>
+setFlags(int argc, char** argv, bool hasprop) {
   auto readNewFlags = [&]() {
     auto oldFlagsfile = FLAGS_flagsfile;
     LOG(INFO) << "Parsing command line flags";

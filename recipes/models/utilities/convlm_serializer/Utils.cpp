@@ -1,8 +1,7 @@
-#include "experimental/ConvLM/Utils.h"
+#include "recipes/models/utilities/convlm_serializer/Utils.h"
 #include <glog/logging.h>
 #include <module/module.h>
 #include <fstream>
-#include "common/FlashlightUtils.h"
 #include "common/Utils.h"
 
 using fl::Variable;

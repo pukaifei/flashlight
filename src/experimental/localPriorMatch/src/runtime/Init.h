@@ -17,8 +17,8 @@
 #include "libraries/common/Dictionary.h"
 
 namespace w2l {
-std::unordered_map<std::string, std::string> setFlags(
-    int argc, char** argv, bool hasprop=true);
+std::unordered_map<std::string, std::string>
+setFlags(int argc, char** argv, bool hasprop = true);
 
 std::shared_ptr<fl::Module> initLM(const Dictionary& lmDict);
 

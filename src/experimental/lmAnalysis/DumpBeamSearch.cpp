@@ -17,7 +17,6 @@
 #include "common/Utils.h"
 #include "criterion/criterion.h"
 #include "data/W2lListFilesDataset.h"
-#include "data/W2lNumberedFilesDataset.h"
 #include "module/module.h"
 #include "runtime/Serial.h"
 #include "experimental/localPriorMatch/src/runtime/Defines.h"
@@ -110,15 +109,10 @@ int main(int argc, char** argv) {
 
   std::shared_ptr<W2lDataset> testset;
   FLAGS_sampletarget = 0.0; // make sure to not sample wordpiece combinations
-  if (FLAGS_listdata) {
-    auto lexicon = loadWords(FLAGS_lexicon, FLAGS_maxword);
+  auto lexicon = loadWords(FLAGS_lexicon, FLAGS_maxword);
 
-    testset = std::make_shared<W2lListFilesDataset>(
-        dataset, dicts, lexicon, 1, 0, 1, true, true);
-  } else {
-    testset = std::make_shared<W2lNumberedFilesDataset>(
-        dataset, dicts, 1, 0, 1, FLAGS_datadir);
-  }
+  testset = std::make_shared<W2lListFilesDataset>(
+      dataset, dicts, lexicon, 1, 0, 1, true, true);
 
   /* ================= Print network information ================== */
   LOG(INFO) << "[Network] " << network->prettyString();

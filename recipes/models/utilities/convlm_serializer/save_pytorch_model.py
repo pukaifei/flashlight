@@ -1,8 +1,4 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
-import absolute_import
-import division
-import print_function
-import unicode_literals
 import sys
 from collections import defaultdict
 
@@ -66,7 +62,7 @@ def save_model(pytorch_model_path, dst):
 
 
 if __name__ == "__main__":
-    print("Converting the model")
+    print("Converting the model. Usage: save_pytorch_model.py [path/to/model] [dst]")
     path = sys.argv[1]
     dst = sys.argv[2]
     save_model(path, dst)

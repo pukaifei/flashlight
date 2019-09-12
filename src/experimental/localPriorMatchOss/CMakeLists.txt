@@ -19,7 +19,7 @@ target_link_libraries(
   wav2letter++
   runtime_lpm_oss         # localPriorMatchOss-specific
   module_lpm_oss          # localPriorMatchOss-specific
-  convlm-experimental # see src/experimental/ConvLM
+  convlm-serializer # see recipes/models/utilities/convlm_serializer
   )
 
 # ------- Local Prior Matching (Tied Proposal Model) -------
@@ -43,4 +43,3 @@ target_link_libraries(
   Train_lpm_oss
   wav2letter++_lpm_oss
 )
- 
