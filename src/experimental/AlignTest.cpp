@@ -6,7 +6,6 @@
 #include "common/Defines.h"
 #include "common/FlashlightUtils.h"
 #include "experimental/AlignUtils.h"
-using namespace w2l;
 namespace {} // namespace
 
 TEST(AlignTest, getAlignedWords) {

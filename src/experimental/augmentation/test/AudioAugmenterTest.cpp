@@ -11,7 +11,6 @@
 #include "data/Sound.h"
 #include "experimental/augmentation/AudioAugmenter.h"
 
-using namespace ::testing;
 using namespace w2l;
 
 namespace {
