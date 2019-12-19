@@ -46,7 +46,6 @@ void evalOutput(
 void evalDataset(
     std::shared_ptr<fl::Module> ntwrk,
     std::shared_ptr<SequenceCriterion> crit,
-    std::shared_ptr<fl::Module> lmcrit,
     std::shared_ptr<W2lDataset> testds,
     SSLDatasetMeters& mtrs,
     const Dictionary& dict) {
@@ -56,11 +55,7 @@ void evalDataset(
     auto output = ntwrk->forward({fl::input(sample[kInputIdx])}).front();
     auto critOut =
         crit->forward({output, fl::Variable(sample[kTargetIdx], false)});
-    auto lmcritLoss = lmcrit->forward({critOut[1]}).front();
-    auto loss = (1 - FLAGS_lmweight) * critOut[0] + FLAGS_lmweight * lmcritLoss;
-    mtrs.losses[kASR].add(critOut[0].array());
-    mtrs.losses[kLM].add(lmcritLoss.array());
-    mtrs.losses[kFullModel].add(loss.array());
+    mtrs.values[kASRLoss].add(critOut[0].array());
 
     evalOutput(output.array(), sample[kTargetIdx], mtrs.edits, dict, crit);
   }
@@ -69,7 +64,6 @@ void evalDataset(
 void runEval(
     std::shared_ptr<fl::Module> network,
     std::shared_ptr<SequenceCriterion> criterion,
-    std::shared_ptr<fl::Module> lmcrit,
     const std::unordered_map<std::string, std::shared_ptr<W2lDataset>>& ds,
     SSLTrainMeters& meters,
     const Dictionary& dict) {
@@ -77,8 +71,7 @@ void runEval(
   criterion->eval();
 
   for (auto& d : ds) {
-    evalDataset(
-        network, criterion, lmcrit, d.second, meters.valid[d.first], dict);
+    evalDataset(network, criterion, d.second, meters.valid[d.first], dict);
   }
 }
 

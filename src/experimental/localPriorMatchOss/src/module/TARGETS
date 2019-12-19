@@ -3,10 +3,10 @@ load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
 cpp_library(
     name = "module",
     srcs = [
-        "LMCritic.cpp",
+        "LMWrapper.cpp",
     ],
     headers = [
-        "LMCritic.h",
+        "LMWrapper.h",
     ],
     preprocessor_flags = [
         "-Ideeplearning/projects/wav2letter/src",

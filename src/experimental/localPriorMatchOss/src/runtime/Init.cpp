@@ -17,12 +17,10 @@
 #include "common/FlashlightUtils.h"
 #include "experimental/localPriorMatchOss/src/runtime/Defines.h"
 #include "experimental/localPriorMatchOss/src/runtime/Utils.h"
-#include "recipes/models/utilities/convlm_serializer/Utils.h"
 #include "runtime/Serial.h"
 
 namespace w2l {
-std::unordered_map<std::string, std::string>
-setFlags(int argc, char** argv, bool hasprop) {
+std::unordered_map<std::string, std::string> setFlags(int argc, char** argv) {
   auto readNewFlags = [&]() {
     auto oldFlagsfile = FLAGS_flagsfile;
     LOG(INFO) << "Parsing command line flags";
@@ -65,6 +63,7 @@ setFlags(int argc, char** argv, bool hasprop) {
   if (runStatus == kTrainMode) {
     readNewFlags();
     runPath = newRunPath(FLAGS_rundir, FLAGS_runname, FLAGS_tag);
+    propPath = FLAGS_proposalModel;
   } else if (runStatus == kContinueMode) {
     runPath = argv[2];
     while (fileExists(getRunFile("model_last.bin", runIdx, runPath))) {
@@ -75,21 +74,15 @@ setFlags(int argc, char** argv, bool hasprop) {
     LOG(INFO) << "reload path is " << reloadPath;
     std::tie(startEpoch, startIter) = loadOldFlags(reloadPath);
     readNewFlags();
-  } else if (runStatus == kForkMode || runStatus == kForkAMMode) {
+    propPath = getRunFile("prop.bin", runIdx - 1, runPath);
+  } else if (runStatus == kForkMode) {
     reloadPath = argv[2];
     loadOldFlags(reloadPath);
     readNewFlags();
     runPath = newRunPath(FLAGS_rundir, FLAGS_runname, FLAGS_tag);
+    propPath = FLAGS_proposalModel;
   } else {
     LOG(FATAL) << gflags::ProgramUsage();
-  }
-
-  if (hasprop) {
-    if (runStatus == kContinueMode) {
-      propPath = getRunFile("prop.bin", runIdx - 1, runPath);
-    } else {
-      propPath = FLAGS_proppath;
-    }
   }
 
   std::vector<std::string> argvs;
@@ -116,57 +109,4 @@ setFlags(int argc, char** argv, bool hasprop) {
   return config;
 }
 
-std::shared_ptr<fl::Module> initLM(const Dictionary& lmDict) {
-  std::shared_ptr<fl::Module> lmNetwork;
-
-  if (!FLAGS_lm.empty()) {
-    W2lSerializer::load(FLAGS_lm, lmNetwork);
-  } else {
-    std::shared_ptr<fl::BinaryModule> lmCriterion;
-
-    std::vector<int> adaptiveTail;
-    if (FLAGS_lmcrit == kLMASCrit) {
-      auto cutoffs = splitOnAnyOf(",", FLAGS_lmadasoftmaxcutoff, true);
-      for (const auto& val : cutoffs) {
-        adaptiveTail.push_back(std::stoi(val));
-      }
-      adaptiveTail.push_back(lmDict.indexSize());
-    }
-
-    loadConvLM(
-        lmNetwork,
-        lmCriterion,
-        FLAGS_lmarchfile,
-        FLAGS_lmweightfile,
-        lmDict.indexSize(),
-        adaptiveTail,
-        FLAGS_lmadasoftmaxinputdim);
-
-    if (lmCriterion) {
-      auto as = std::static_pointer_cast<fl::AdaptiveSoftMaxLoss>(lmCriterion)
-                    ->getActivation();
-      std::dynamic_pointer_cast<fl::Sequential>(lmNetwork)->add(as);
-    }
-  }
-
-  return lmNetwork;
-}
-
-std::shared_ptr<LMCritic> createLMCritic(
-    const Dictionary& lmDict,
-    const Dictionary& amDict) {
-  auto lmNetwork = initLM(lmDict);
-  std::vector<int> dictIndexMap;
-  int numDictPadding;
-  std::tie(dictIndexMap, numDictPadding) = genTokenDictIndexMap(lmDict, amDict);
-
-  auto lmcrit = std::make_shared<LMCritic>(
-      lmNetwork,
-      dictIndexMap,
-      numDictPadding,
-      lmDict.getIndex(kEosToken),
-      lmDict.getIndex(kUnkToken));
-
-  return lmcrit;
-}
 } // namespace w2l

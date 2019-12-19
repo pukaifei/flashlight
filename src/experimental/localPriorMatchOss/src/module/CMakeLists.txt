@@ -8,7 +8,7 @@ add_library(
 target_sources(
   module_lpm_oss
   INTERFACE
-  ${CMAKE_CURRENT_SOURCE_DIR}/LMCritic.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/LMWrapper.cpp
   )
 
 target_link_libraries(

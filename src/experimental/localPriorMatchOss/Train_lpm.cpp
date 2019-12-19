@@ -19,20 +19,13 @@
 #include "common/FlashlightUtils.h"
 #include "criterion/criterion.h"
 #include "data/Featurize.h"
-#include "experimental/localPriorMatchOss/src/module/LMCritic.h"
+#include "experimental/localPriorMatchOss/src/module/LMWrapper.h"
 #include "experimental/localPriorMatchOss/src/runtime/runtime.h"
 #include "libraries/common/Dictionary.h"
 #include "module/module.h"
 #include "runtime/runtime.h"
 
 using namespace w2l;
-
-double avgValidErr(SSLTrainMeters& meters) {
-  double err;
-  for (auto& s : meters.valid) { err += s.second.edits[kTarget].value()[0]; }
-  err /= meters.valid.size();
-  return err;
-}
 
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
@@ -49,7 +42,7 @@ int main(int argc, char** argv) {
   }
 
   /* ===================== Parse Options ===================== */
-  auto config = setFlags(argc, argv, true);
+  auto config = setFlags(argc, argv);
 
   int runIdx = std::stoi(config[kRunIdx]);
   std::string reloadPath = config[kReloadPath];
@@ -81,30 +74,27 @@ int main(int argc, char** argv) {
 
   /* ===================== Create Dictionary & Lexicon ===================== */
   auto dictPath = pathsConcat(FLAGS_tokensdir, FLAGS_tokens);
-  if (dictPath.empty() || !fileExists(dictPath)) {
-    throw std::runtime_error("Invalid dictionary filepath specified.");
-  }
-  Dictionary dict(dictPath);
+  Dictionary amDict(dictPath);
   // Setup-specific modifications
   if (FLAGS_eostoken) {
-    dict.addEntry(kEosToken);
+    amDict.addEntry(kEosToken);
   }
-
-  int numClasses = dict.indexSize();
-  dict.setDefaultIndex(numClasses);
+  int numClasses = amDict.indexSize();
   LOG_MASTER(INFO) << "Number of classes (network) = " << numClasses;
 
   DictionaryMap dicts;
-  dicts.insert({kTargetIdx, dict});
+  dicts.insert({kTargetIdx, amDict});
+
+  // Note: fairseq vocab should start with:
+  // <fairseq_style> - 0 <pad> - 1, kEosToken - 2, kUnkToken - 3
+  Dictionary lmDict(FLAGS_lmdict);
+  lmDict.setDefaultIndex(lmDict.getIndex(kUnkToken));
 
   auto lexicon = loadWords(FLAGS_lexicon, FLAGS_maxword);
-
-  Dictionary lmDict = createFairseqTokenDict(FLAGS_lmdict);
 
   /* =========== Create Network & Optimizers / Reload Snapshot ============ */
   std::shared_ptr<fl::Module> network;
   std::shared_ptr<Seq2SeqCriterion> criterion;
-  std::shared_ptr<LMCritic> lmcrit;
   std::shared_ptr<fl::FirstOrderOptimizer> netoptim;
 
   if (runStatus == kTrainMode) {
@@ -114,27 +104,27 @@ int main(int argc, char** argv) {
 
     network = createW2lSeqModule(archfile, numFeatures, numClasses);
     criterion = std::make_shared<Seq2SeqCriterion>(
-        buildSeq2Seq(numClasses, dict.getIndex(kEosToken)));
-    lmcrit = createLMCritic(lmDict, dict);
+        buildSeq2Seq(numClasses, amDict.getIndex(kEosToken)));
   } else {
     std::unordered_map<std::string, std::string> cfg; // unused
     std::shared_ptr<SequenceCriterion> base_criterion;
-    if (runStatus == kForkAMMode) {
-      W2lSerializer::load(reloadPath, cfg, network, base_criterion, netoptim);
-      lmcrit = createLMCritic(lmDict, dict);
-    } else {
-      W2lSerializer::load(
-          reloadPath, cfg, network, base_criterion, netoptim, lmcrit);
-    }
+    W2lSerializer::load(reloadPath, cfg, network, base_criterion, netoptim);
     criterion = std::dynamic_pointer_cast<Seq2SeqCriterion>(base_criterion);
   }
+
+  // create LM
+  std::shared_ptr<fl::Module> lmNetwork;
+  W2lSerializer::load(FLAGS_lm, lmNetwork);
+  auto dictIndexMap = genTokenDictIndexMap(amDict, lmDict);
+  auto lm = std::make_shared<LMWrapper>(
+      lmNetwork, dictIndexMap, lmDict.getIndex(kEosToken));
 
   LOG_MASTER(INFO) << "[Network] " << network->prettyString();
   LOG_MASTER(INFO) << "[Network Params: " << numTotalParams(network) << "]";
   LOG_MASTER(INFO) << "[Criterion] " << criterion->prettyString();
   LOG_MASTER(INFO) << "[Criterion Params: " << numTotalParams(criterion) << "]";
-  LOG_MASTER(INFO) << "[LMCritic] " << lmcrit->prettyString();
-  LOG_MASTER(INFO) << "[LMCritic Params: " << numTotalParams(lmcrit) << "]";
+  LOG_MASTER(INFO) << "[LM] " << lm->prettyString();
+  LOG_MASTER(INFO) << "[LM Params: " << numTotalParams(lm) << "]";
 
   if (runStatus != kContinueMode) {
     netoptim = initOptimizer(
@@ -146,23 +136,15 @@ int main(int argc, char** argv) {
   }
   LOG_MASTER(INFO) << "[Optimizer] " << netoptim->prettyString();
 
-  /* =========== Create Proposal Network and Reload ============ */
+  /* =========== Load Proposal Network ============ */
   LOG(INFO) << "Load proposal model from " << propPath;
-  std::unordered_map<std::string, std::string> propcfg;
+  std::unordered_map<std::string, std::string> propcfg; // unused
   std::shared_ptr<fl::Module> propnet;
   std::shared_ptr<SequenceCriterion> base_propcrit;
   std::shared_ptr<Seq2SeqCriterion> propcrit;
-  // we do not save the optimizer in the proposal model binary, but the initial
-  // proposal is forked from some Seq2Seq model binary that includes an
-  // optimizer.
-  if (runStatus == kContinueMode) {
-    W2lSerializer::load(propPath, propcfg, propnet, base_propcrit);
-    propcrit = std::dynamic_pointer_cast<Seq2SeqCriterion>(base_propcrit);
-  } else {
-    std::shared_ptr<fl::FirstOrderOptimizer> propnetoptim;
-    W2lSerializer::load(propPath, propcfg, propnet, base_propcrit, propnetoptim);
-    propcrit = std::dynamic_pointer_cast<Seq2SeqCriterion>(base_propcrit);
-  }
+
+  W2lSerializer::load(propPath, propcfg, propnet, base_propcrit);
+  propcrit = std::dynamic_pointer_cast<Seq2SeqCriterion>(base_propcrit);
 
   /* ===================== Create Dataset ===================== */
   auto pairedDs = createDataset(
@@ -209,8 +191,6 @@ int main(int argc, char** argv) {
   for (const auto& s : validds) {
     meters.valid[s.first] = SSLDatasetMeters();
   }
-  resetTimeStatMeters(meters);
-  resetDatasetMeters(meters.train);
 
   /* ===================== Logging ===================== */
   bool logOnEpoch = FLAGS_reportiters == 0;
@@ -227,291 +207,246 @@ int main(int argc, char** argv) {
   fl::allReduceParameters(network);
   fl::allReduceParameters(criterion);
 
-  auto train = [&meters,
-                &trainEvalIds,
-                &trainDscheduler,
-                &validds,
-                &startEpoch,
-                &startIter,
-                &nItersPerEpoch,
-                &network,
-                &criterion,
-                &lmcrit,
-                &netoptim,
-                &dicts,
-                &config,
-                &propnet,
-                &propcrit,
-                &base_propcrit,
-                &propcfg,
-                &worldRank,
-                &runIdx,
-                &runPath,
-                &logHelper,
-                &logOnEpoch,
-                &reducer](int nEpochs) {
-    int64_t curEpoch = startEpoch;
-    int64_t curIter = startIter;
-    bool isPairedData;
-    network->train();
-    criterion->train();
-    lmcrit->eval();
-    propnet->eval();
-    propcrit->eval();
+  /* ===================== Training starts ===================== */
+  int64_t curEpoch = startEpoch;
+  int64_t curIter = startIter;
+  bool isPairedData;
+  network->train();
+  criterion->train();
+  lm->eval();
+  propnet->eval();
+  propcrit->eval();
 
-    logHelper.saveProposalModel(propcfg, propnet, propcrit);
-    runEval(propnet, propcrit, lmcrit, validds, meters, dicts[kTargetIdx]);
-    syncMeter(meters);
-    double properr = avgValidErr(meters);
-    LOG(INFO) << "Initial ProposalNetwork Err = " << properr;
+  logHelper.saveModel("prop.bin", propcfg, propnet, propcrit);
+  runEval(propnet, propcrit, validds, meters, dicts[kTargetIdx]);
+  syncMeter(meters);
+  double properr = avgValidErr(meters);
+  LOG_MASTER(INFO) << "Initial ProposalNetwork Err = " << properr;
 
-    while (curEpoch < nEpochs) {
-      double lrScale = std::pow(FLAGS_gamma, curEpoch / FLAGS_stepsize);
-      netoptim->setLr(lrScale * FLAGS_lr);
+  resetTrainMeters(meters);
 
-      double lmTempScale =
-          std::pow(FLAGS_gamma, curEpoch / FLAGS_lmtempstepsize);
+  while (curEpoch < FLAGS_iter) {
+    double lrScale = std::pow(FLAGS_gamma, curEpoch / FLAGS_stepsize);
+    netoptim->setLr(lrScale * FLAGS_lr);
 
-      ++curEpoch;
+    ++curEpoch;
+    af::sync();
+    meters.timer[kSampleTimer].resume();
+    meters.timer[kRuntime].resume();
+    meters.timer[kTimer].resume();
+    LOG_MASTER(INFO) << "Epoch " << curEpoch << " started!";
+    LOG_MASTER(INFO) << "  Learning rate = " << netoptim->getLr();
+
+    int scheduleIter = 0;
+    while (scheduleIter < nItersPerEpoch) {
+      auto sample = trainDscheduler.get();
+      isPairedData = af::allTrue<bool>(sample[kDataTypeIdx] == kParallelData);
+      ++curIter;
+      ++scheduleIter;
       af::sync();
-      meters.timer[kSampleTimer].resume();
-      meters.timer[kRuntime].resume();
-      meters.timer[kTimer].resume();
-      LOG_MASTER(INFO) << "Epoch " << curEpoch << " started!";
-      LOG_MASTER(INFO) << "  Learning rate = " << lrScale * FLAGS_lr;
+      int bs = isPairedData ? FLAGS_batchsize : FLAGS_unpairedBatchsize;
 
-      // linearly warm up the amount of unpaired audio data used in training
-      if (FLAGS_audiowarmupepochs > 0 && curEpoch > FLAGS_pretrainWindow &&
-          (curEpoch - FLAGS_pretrainWindow) <= FLAGS_audiowarmupepochs) {
-        int unpairedIter = (curEpoch - FLAGS_pretrainWindow) * FLAGS_audioiter /
-            FLAGS_audiowarmupepochs;
-        trainDscheduler.setSchedule({FLAGS_pairediter, unpairedIter});
-        nItersPerEpoch = FLAGS_pairediter + unpairedIter;
+      meters.timer[kTimer].incUnit();
+      meters.timer[kSampleTimer].stopAndIncUnit();
+      meters.stats.add(sample[kInputIdx], sample[kTargetIdx]);
+      if (af::anyTrue<bool>(af::isNaN(sample[kInputIdx])) ||
+          af::anyTrue<bool>(af::isNaN(sample[kTargetIdx]))) {
+        LOG(FATAL) << "Sample has NaN values";
       }
 
-      std::vector<std::vector<int>> paths;
-      std::vector<int> hypoNums;
-      int scheduleIter = 0;
-      while (scheduleIter < nItersPerEpoch) {
-        auto sample = trainDscheduler.get();
-        isPairedData = af::allTrue<bool>(sample[kDataTypeIdx] == kParallelData);
-        ++curIter;
-        ++scheduleIter;
-        af::sync();
-        paths.clear();
-        hypoNums.clear();
-        int bs  = isPairedData ? FLAGS_batchsize : FLAGS_unpairedBatchsize;
+      // forward
+      meters.timer[kFwdTimer].resume();
+      auto output = network->forward({fl::input(sample[kInputIdx])}).front();
+      af::sync();
 
-        meters.timer[kTimer].incUnit();
-        meters.timer[kSampleTimer].stopAndIncUnit();
-        meters.stats.add(sample[kInputIdx], sample[kTargetIdx]);
-        if (af::anyTrue<bool>(af::isNaN(sample[kInputIdx])) ||
-            af::anyTrue<bool>(af::isNaN(sample[kTargetIdx]))) {
-          LOG(FATAL) << "Sample has NaN values";
+      fl::Variable loss;
+      fl::Variable lment;
+      auto targets = fl::noGrad(sample[kTargetIdx]);
+      auto tgtLen = getTargetLength(
+          targets.array(), dicts[kTargetIdx].getIndex(kEosToken));
+      if (isPairedData) {
+        meters.timer[kCritFwdTimer].resume();
+        loss = criterion->forward({output, targets}).front();
+
+        if (af::anyTrue<bool>(af::isNaN(loss.array()))) {
+          LOG(FATAL) << "ASR loss has NaN values";
         }
+        meters.train.values[kASRLoss].add(loss.array());
+        meters.timer[kCritFwdTimer].stopAndIncUnit();
+      } else {
+        fl::Variable lmLogprob;
+        meters.timer[kBeamTimer].resume();
+        std::vector<std::vector<int>> paths;
+        std::vector<int> hypoNums;
+        auto propoutput =
+            propnet->forward({fl::input(sample[kInputIdx])}).front();
+        std::tie(paths, hypoNums) = batchBeamSearch(
+            propoutput, propcrit, dicts[kTargetIdx].getIndex(kEosToken));
+        meters.timer[kBeamTimer].stopAndIncUnit();
 
-        // forward
-        meters.timer[kFwdTimer].resume();
-        auto output = network->forward({fl::input(sample[kInputIdx])}).front();
-        af::sync();
+        auto refLen = afToVector<int>(tgtLen);
+        std::tie(paths, hypoNums) = filterBeamByLength(paths, hypoNums, refLen);
+        auto hypoNumsArr =
+            af::array(af::dim4(hypoNums.size()), hypoNums.data());
+        af::array remIdx = af::sort(af::where(hypoNumsArr));
+        int remBs = remIdx.dims()[0];
 
-        fl::Variable loss;
-        fl::Variable lment;
-        if (isPairedData) {
-          meters.timer[kCritFwdTimer].resume();
-          loss = criterion->forward(
-              {output, fl::noGrad(sample[kTargetIdx])}).front();
+        if (remBs == 0) {
+          LOG(INFO) << "WARNING : using a made-up loss because of empty batch";
+          tgtLen = af::constant(0, {1}, s32);
+          // create a made-up loss with 0 value that is a function of
+          // parameters to train, so the grad will be all 0.
+          loss = criterion->forward({output, fl::noGrad(sample[kTargetIdx])})
+                     .front();
+          loss = 0.0 * loss;
+        } else {
+          targets = fl::noGrad(
+              batchTarget(paths, dicts[kTargetIdx].getIndex(kEosToken)));
+          tgtLen = getTargetLength(
+              targets.array(), dicts[kTargetIdx].getIndex(kEosToken));
+
+          meters.timer[kLMFwdTimer].resume();
+          lmLogprob =
+              fl::negate(lm->forward({targets, fl::noGrad(tgtLen)}).front());
+          meters.timer[kLMFwdTimer].stopAndIncUnit();
+
+          meters.timer[kBeamFwdTimer].resume();
+          hypoNums = afToVector<int>(hypoNumsArr(remIdx));
+          output =
+              batchEncoderOutput(hypoNums, output(af::span, af::span, remIdx));
+          loss = criterion->forward({output, targets}).front();
+
+          auto lmRenormProb = adjustProb(lmLogprob, hypoNums, true, true);
+          loss = FLAGS_lmweight * lmRenormProb * loss;
+          meters.timer[kBeamFwdTimer].stopAndIncUnit();
+
+          meters.values[kLen].add(tgtLen);
+          meters.values[kNumHypos].add(static_cast<double>(paths.size()));
+
+          lment = entropy(lmRenormProb) / static_cast<float>(hypoNums.size());
+          meters.values[kLMEnt].add(lment.array());
+          meters.values[kLMScore].add(lmLogprob.array());
 
           if (af::anyTrue<bool>(af::isNaN(loss.array()))) {
-            LOG(FATAL) << "ASR loss has NaN values";
+            LOG(FATAL) << "LPM loss has NaN values";
           }
-          meters.train.losses[kASR].add(loss.array());
-          meters.timer[kCritFwdTimer].stopAndIncUnit();
-        } else {
-          fl::Variable lmLogprob;
-          meters.timer[kBeamTimer].resume();
-          auto propoutput =
-              propnet->forward({fl::input(sample[kInputIdx])}).front();
-          std::tie(paths, hypoNums) = batchBeamSearch(propoutput, propcrit, dicts[kTargetIdx].getIndex(kEosToken));
-          meters.timer[kBeamTimer].stopAndIncUnit();
-
-          auto refLen = afToVector<int>(getTargetLength(
-              sample[kTargetIdx], dicts[kTargetIdx].getIndex(kEosToken)));
-          std::tie(paths, hypoNums) = filterBeamByLength(paths, hypoNums, refLen);
-          auto hypoNumsArr = af::array(af::dim4(hypoNums.size()), hypoNums.data());
-          af::array remIdx = af::sort(af::where(hypoNumsArr));
-          int remBs = remIdx.dims()[0];
-
-          if (remBs == 0) {
-            LOG(INFO) << "WARNING : using a made-up loss because remBs=0";
-            // create a made-up loss with 0 value that is a function of
-            // parameters to train, so the grad will be all 0.
-            loss = criterion->forward(
-                {output, fl::noGrad(sample[kTargetIdx])}).front();
-            loss = 0.0 * loss;
-          } else {
-            output = output(af::span, af::span, remIdx);
-            hypoNums = afToVector<int>(hypoNumsArr(remIdx));
-
-            meters.timer[kLMCritFwdTimer].resume();
-            lmLogprob = computeLmLogprob(paths, lmcrit, dicts[kTargetIdx]);
-            meters.timer[kLMCritFwdTimer].stopAndIncUnit();
-
-            meters.timer[kBeamFwdTimer].resume();
-            auto s2sLogprob = computeS2SLogprob(
-                paths, hypoNums, output, criterion, dicts[kTargetIdx]);
-
-            loss = computePriorMatchingLoss(lmLogprob, s2sLogprob, hypoNums);
-            lment = entropy(lmLogprob, hypoNums);
-            meters.timer[kBeamFwdTimer].stopAndIncUnit();
-
-            for (auto& path : paths) {
-              meters.train.losses[kLen].add(static_cast<double>(path.size()));
-            }
-            meters.train.losses[kNumHypos].add(static_cast<double>(paths.size()));
-            meters.train.losses[kLMEnt].add(lment.array());
-            meters.train.losses[kLMScore].add(lmLogprob.array());
-
-            if (af::anyTrue<bool>(af::isNaN(loss.array()))) {
-              LOG(FATAL) << "LMCritic loss has NaN values";
-            }
-            meters.train.losses[kLM].add(loss.array());
-            loss = FLAGS_lmweight * loss;
-          }
-        }
-
-        af::sync();
-        meters.timer[kFwdTimer].stopAndIncUnit();
-        meters.train.losses[kFullModel].add(loss.array());
-
-        // compute training error rate from parallel data
-        if (isPairedData) {
-          auto globalBatchIdx = afToVector<int64_t>(sample[kGlobalBatchIdx]);
-          if (trainEvalIds.find(globalBatchIdx[0]) != trainEvalIds.end()) {
-            evalOutput(
-                output.array(),
-                sample[kTargetIdx],
-                meters.train.edits,
-                dicts[kTargetIdx],
-                criterion);
-          }
-        }
-
-        // backward
-        meters.timer[kBwdTimer].resume();
-        netoptim->zeroGrad();
-        lmcrit->zeroGrad();
-
-        loss.backward();
-        if (reducer) {
-          reducer->finalize();
-        }
-
-        af::sync();
-        meters.timer[kBwdTimer].stopAndIncUnit();
-        meters.timer[kOptimTimer].resume();
-
-        // scale down gradients by batchsize note that the original batchsize
-        // bs is used instead of remBs, since different workers may have
-        // different remBs. for the sake of simplicity we just use bs.
-        for (const auto& p : network->params()) {
-          if (!p.isGradAvailable()) {
-            continue;
-          }
-          p.grad() = p.grad() / bs;
-        }
-        for (const auto& p : criterion->params()) {
-          if (!p.isGradAvailable()) {
-            continue;
-          }
-          p.grad() = p.grad() / bs;
-        }
-        // LOG_MASTER(INFO) << "clip grad";
-        if (FLAGS_maxgradnorm > 0) {
-          auto params = network->params();
-          auto critparams = criterion->params();
-          params.insert(params.end(), critparams.begin(), critparams.end());
-          fl::clipGradNorm(params, FLAGS_maxgradnorm);
-        }
-        // LOG_MASTER(INFO) << "step";
-        netoptim->step();
-        af::sync();
-        meters.timer[kOptimTimer].stopAndIncUnit();
-        meters.timer[kSampleTimer].resume();
-
-        auto lengths = getLengths<int, int>(paths);
-        LOG_MASTER(INFO) << "[ Epoch " << curEpoch << " ]"
-                         << " Iter=" << scheduleIter
-                         << " isPairedData=" << isPairedData
-                         << " AvgLoss=" << fl::mean(loss, {0}).scalar<float>()
-                         << " MinLen=" << *std::min_element(lengths.begin(), lengths.end())
-                         << " MaxLen=" << *std::max_element(lengths.begin(), lengths.end());
-
-
-        // checkpoint evaluation
-        if ((!logOnEpoch && curIter % FLAGS_reportiters == 0) ||
-            (logOnEpoch && scheduleIter == nItersPerEpoch)) {
-          stopTimeMeters(meters);
-          runEval(
-              network, criterion, lmcrit, validds, meters, dicts[kTargetIdx]);
-
-          config[kEpoch] = std::to_string(curEpoch);
-          config[kIteration] = std::to_string(curIter);
-          std::unordered_map<std::string, double> logFields(
-              {{"lr", netoptim->getLr()},
-               {"lmcrit-t", lmTempScale * FLAGS_gumbeltemperature}});
-          logHelper.logAndSaveModel(
-              meters, config, network, criterion, lmcrit, netoptim, logFields);
-
-          resetDatasetMeters(meters.train);
-          resetTimeStatMeters(meters);
-          network->train();
-          criterion->train();
-          meters.timer[kSampleTimer].resume();
-          meters.timer[kRuntime].resume();
-          meters.timer[kTimer].resume();
-
-          // maybe update proposal network
-          double newproperr = avgValidErr(meters);
-          LOG(INFO) << "ProposalNetwork:"
-                    << " new=" << newproperr
-                    << " old=" << properr;
-          if ((FLAGS_propupdate == kAlways) ||
-              (FLAGS_propupdate == kBetter && properr > newproperr)) {
-            LOG(INFO) << "Update proposal model to the current model";
-            logHelper.saveProposalModel(config, network, criterion);
-            properr = newproperr;
-
-            // TODO: better method for loading the best model to the proposal model?
-            std::string workerPropPath = logHelper.saveWorkerProposalModel(
-                config, network, criterion, worldRank);
-            W2lSerializer::load(workerPropPath, propcfg, propnet, base_propcrit);
-            propcrit = std::dynamic_pointer_cast<Seq2SeqCriterion>(base_propcrit);
-            propnet->eval();
-            propcrit->eval();
-          }
+          meters.values[kLPMLoss].add(loss.array());
         }
       }
+
       af::sync();
+      meters.timer[kFwdTimer].stopAndIncUnit();
+      meters.values[kFullLoss].add(loss.array());
+
+      // compute training error rate from parallel data
+      if (isPairedData) {
+        auto globalBatchIdx = afToVector<int64_t>(sample[kGlobalBatchIdx]);
+        if (trainEvalIds.find(globalBatchIdx[0]) != trainEvalIds.end()) {
+          evalOutput(
+              output.array(),
+              sample[kTargetIdx],
+              meters.train.edits,
+              dicts[kTargetIdx],
+              criterion);
+        }
+      }
+
+      // backward
+      meters.timer[kBwdTimer].resume();
+      netoptim->zeroGrad();
+      lm->zeroGrad();
+
+      loss.backward();
+      if (reducer) {
+        reducer->finalize();
+      }
+
+      af::sync();
+      meters.timer[kBwdTimer].stopAndIncUnit();
+      meters.timer[kOptimTimer].resume();
+
+      // scale down gradients by batchsize note that the original batchsize
+      // bs is used instead of remBs, since different workers may have
+      // different remBs. for the sake of simplicity we just use bs.
+      for (const auto& p : network->params()) {
+        if (!p.isGradAvailable()) {
+          continue;
+        }
+        p.grad() = p.grad() / bs;
+      }
+      for (const auto& p : criterion->params()) {
+        if (!p.isGradAvailable()) {
+          continue;
+        }
+        p.grad() = p.grad() / bs;
+      }
+      if (FLAGS_maxgradnorm > 0) {
+        auto params = network->params();
+        auto critparams = criterion->params();
+        params.insert(params.end(), critparams.begin(), critparams.end());
+        fl::clipGradNorm(params, FLAGS_maxgradnorm);
+      }
+
+      netoptim->step();
+      af::sync();
+      meters.timer[kOptimTimer].stopAndIncUnit();
+      meters.timer[kSampleTimer].resume();
+
+      auto lengths = afToVector<int>(tgtLen);
+      LOG(INFO) << "[ Epoch " << curEpoch << " ]"
+                << " Iter=" << scheduleIter << " isPairedData=" << isPairedData
+                << " AvgLoss=" << fl::mean(loss, {0}).scalar<float>()
+                << " MinLen="
+                << *std::min_element(lengths.begin(), lengths.end())
+                << " MaxLen="
+                << *std::max_element(lengths.begin(), lengths.end());
+
+      // checkpoint evaluation
+      if ((!logOnEpoch && curIter % FLAGS_reportiters == 0) ||
+          (logOnEpoch && scheduleIter == nItersPerEpoch)) {
+        stopTimeMeters(meters);
+        runEval(network, criterion, validds, meters, dicts[kTargetIdx]);
+
+        config[kEpoch] = std::to_string(curEpoch);
+        config[kIteration] = std::to_string(curIter);
+        std::unordered_map<std::string, double> logFields(
+            {{"lr", netoptim->getLr()}});
+        logHelper.logAndSaveModel(
+            meters, config, network, criterion, netoptim, logFields);
+
+        resetTrainMeters(meters);
+        network->train();
+        criterion->train();
+        meters.timer[kSampleTimer].resume();
+        meters.timer[kRuntime].resume();
+        meters.timer[kTimer].resume();
+
+        // maybe update proposal network
+        double newproperr = avgValidErr(meters);
+        LOG_MASTER(INFO) << "ProposalNetwork:"
+                         << " new=" << newproperr << " old=" << properr;
+        if ((FLAGS_propupdate == kAlways) ||
+            (FLAGS_propupdate == kBetter && properr > newproperr)) {
+          LOG_MASTER(INFO) << "Update proposal model to the current model";
+          logHelper.saveModel("prop.bin", config, network, criterion);
+          properr = newproperr;
+
+          std::string workerPropPath = logHelper.saveModel(
+              format("prop_worker%03d.bin", worldRank),
+              config,
+              network,
+              criterion,
+              nullptr, // no optimizer for the proposal model
+              true);
+          W2lSerializer::load(workerPropPath, propcfg, propnet, base_propcrit);
+          propcrit = std::dynamic_pointer_cast<Seq2SeqCriterion>(base_propcrit);
+          propnet->eval();
+          propcrit->eval();
+        }
+      }
     }
-
-    startEpoch = curEpoch;
-    startIter = curIter;
-  };
-
-  /* ===================== Training starts ===================== */
-  if (FLAGS_pretrainWindow - startEpoch > 0) {
-    nItersPerEpoch = pairedDs->size();
-    trainDscheduler.setSchedule({pairedDs->size(), 0});
-    train(FLAGS_pretrainWindow);
-    auto s2s = std::dynamic_pointer_cast<Seq2SeqCriterion>(criterion);
-    s2s->clearWindow();
-    nItersPerEpoch = FLAGS_pairediter + FLAGS_audioiter;
-    trainDscheduler.setSchedule({FLAGS_pairediter, FLAGS_audioiter});
-    LOG_MASTER(INFO) << "Finished pretraining";
+    af::sync();
   }
-
-  train(FLAGS_iter);
 
   LOG_MASTER(INFO) << "Finished training";
   return 0;

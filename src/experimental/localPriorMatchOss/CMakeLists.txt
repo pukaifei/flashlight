@@ -19,19 +19,7 @@ target_link_libraries(
   wav2letter++
   runtime_lpm_oss         # localPriorMatchOss-specific
   module_lpm_oss          # localPriorMatchOss-specific
-  convlm-serializer # see recipes/models/utilities/convlm_serializer
   )
-
-# ------- Local Prior Matching (Tied Proposal Model) -------
-add_executable(
-  Train_lpm_tied_oss
-  Train_lpm_tied.cpp
-)
-
-target_link_libraries(
-  Train_lpm_tied_oss
-  wav2letter++_lpm_oss
-)
 
 # ------- Local Prior Matching (Off-Policy Proposal Model) -------
 add_executable(

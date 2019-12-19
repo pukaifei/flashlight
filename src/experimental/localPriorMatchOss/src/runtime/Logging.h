@@ -16,29 +16,23 @@
 #include <flashlight/flashlight.h>
 
 #include "criterion/criterion.h"
-#include "experimental/localPriorMatchOss/src/module/LMCritic.h"
 #include "experimental/localPriorMatchOss/src/runtime/Defines.h"
 #include "runtime/Logger.h"
 
 namespace w2l {
 struct SSLDatasetMeters {
   std::map<std::string, fl::EditDistanceMeter> edits;
-  std::map<std::string, fl::AverageValueMeter> losses;
+  std::map<std::string, fl::AverageValueMeter> values;
 
   SSLDatasetMeters()
       : edits({{kTarget, fl::EditDistanceMeter()},
                {kWord, fl::EditDistanceMeter()}}),
-        losses({{kASR, fl::AverageValueMeter()},
-                {kLM, fl::AverageValueMeter()},
-                {kFullModel, fl::AverageValueMeter()},
-                {kNumHypos, fl::AverageValueMeter()},
-                {kLMEnt, fl::AverageValueMeter()},
-                {kLMScore, fl::AverageValueMeter()},
-                {kLen, fl::AverageValueMeter()}}) {}
+        values({{kASRLoss, fl::AverageValueMeter()}}) {}
 };
 
 struct SSLTrainMeters {
   std::map<std::string, fl::TimeMeter> timer;
+  std::map<std::string, fl::AverageValueMeter> values;
   SSLDatasetMeters train;
   std::map<std::string, SSLDatasetMeters> valid;
   SpeechStatMeter stats;
@@ -51,9 +45,15 @@ struct SSLTrainMeters {
                {kCritFwdTimer, fl::TimeMeter(true)},
                {kBeamTimer, fl::TimeMeter(true)},
                {kBeamFwdTimer, fl::TimeMeter(true)},
-               {kLMCritFwdTimer, fl::TimeMeter(true)},
+               {kLMFwdTimer, fl::TimeMeter(true)},
                {kBwdTimer, fl::TimeMeter(true)},
-               {kOptimTimer, fl::TimeMeter(true)}}) {}
+               {kOptimTimer, fl::TimeMeter(true)}}),
+        values({{kLPMLoss, fl::AverageValueMeter()},
+                {kFullLoss, fl::AverageValueMeter()},
+                {kNumHypos, fl::AverageValueMeter()},
+                {kLMEnt, fl::AverageValueMeter()},
+                {kLMScore, fl::AverageValueMeter()},
+                {kLen, fl::AverageValueMeter()}}) {}
 };
 
 class LogHelper {
@@ -69,31 +69,19 @@ class LogHelper {
       int64_t epoch,
       const std::unordered_map<std::string, double>& logFields);
 
-  void saveModel(
-      const std::string& tag,
+  std::string saveModel(
+      const std::string& filename,
       const std::unordered_map<std::string, std::string>& config,
       std::shared_ptr<fl::Module> network,
       std::shared_ptr<SequenceCriterion> criterion,
-      std::shared_ptr<LMCritic> lmcrit,
-      std::shared_ptr<fl::FirstOrderOptimizer> netoptim);
-
-  void saveProposalModel(
-      const std::unordered_map<std::string, std::string>& config,
-      std::shared_ptr<fl::Module> network,
-      std::shared_ptr<SequenceCriterion> criterion);
-
-  std::string saveWorkerProposalModel(
-      const std::unordered_map<std::string, std::string>& config,
-      std::shared_ptr<fl::Module> network,
-      std::shared_ptr<SequenceCriterion> criterion,
-      int worldRank);
+      std::shared_ptr<fl::FirstOrderOptimizer> netoptim = nullptr,
+      bool workerSave = false);
 
   void logAndSaveModel(
       SSLTrainMeters& meters,
       const std::unordered_map<std::string, std::string>& config,
       std::shared_ptr<fl::Module> network,
       std::shared_ptr<SequenceCriterion> criterion,
-      std::shared_ptr<LMCritic> lmcrit,
       std::shared_ptr<fl::FirstOrderOptimizer> netoptim,
       const std::unordered_map<std::string, double>& logFields);
 
@@ -123,9 +111,12 @@ void syncMeter<SSLTrainMeters>(SSLTrainMeters& meters);
 template <>
 void syncMeter<SSLDatasetMeters>(SSLDatasetMeters& meters);
 
-void resetTimeStatMeters(SSLTrainMeters& meters);
+void resetTrainMeters(SSLTrainMeters& meters);
 
 void stopTimeMeters(SSLTrainMeters& meters);
 
 void resetDatasetMeters(SSLDatasetMeters& meters);
+
+double avgValidErr(SSLTrainMeters& meters);
+
 } // namespace w2l

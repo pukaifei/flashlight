@@ -18,22 +18,3 @@ cpp_binary(
         "glog",
     ],
 )
-
-cpp_binary(
-    name = "train_lpm_tied_cpp",
-    srcs = [
-        "Train_lpm_tied.cpp",
-    ],
-    deps = [
-        "//deeplearning/projects/wav2letter/src/common:common",
-        "//deeplearning/projects/wav2letter/src/criterion:criterion",
-        "//deeplearning/projects/wav2letter/src/experimental/localPriorMatchOss/src/module:module",
-        "//deeplearning/projects/wav2letter/src/experimental/localPriorMatchOss/src/runtime:runtime",
-        "//deeplearning/projects/wav2letter/src/module:module",
-        "//deeplearning/projects/wav2letter/src/runtime:runtime",
-    ],
-    external_deps = [
-        "gflags",
-        "glog",
-    ],
-)

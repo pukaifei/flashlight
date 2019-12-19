@@ -13,7 +13,6 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-#include "common/FlashlightUtils.h"
 #include "experimental/localPriorMatchOss/src/runtime/Defines.h"
 #include "runtime/Serial.h"
 
@@ -92,55 +91,30 @@ void LogHelper::logStatus(
   }
 }
 
-void LogHelper::saveModel(
-    const std::string& tag,
+std::string LogHelper::saveModel(
+    const std::string& filename,
     const std::unordered_map<std::string, std::string>& config,
     std::shared_ptr<fl::Module> network,
     std::shared_ptr<SequenceCriterion> criterion,
-    std::shared_ptr<LMCritic> lmcrit,
-    std::shared_ptr<fl::FirstOrderOptimizer> netoptim) {
-  if (!isMaster_) {
-    return;
+    std::shared_ptr<fl::FirstOrderOptimizer> netoptim /* = nullptr */,
+    bool workerSave /* = false */) {
+  if (!workerSave && !isMaster_) {
+    return "";
   }
 
+  std::string outputfile = getRunFile(filename, runIdx_, runPath_);
   try {
-    std::string filename =
-        getRunFile("model_" + cleanFilepath(tag) + ".bin", runIdx_, runPath_);
-    W2lSerializer::save(filename, config, network, criterion, netoptim, lmcrit);
+    if (netoptim) {
+      W2lSerializer::save(outputfile, config, network, criterion, netoptim);
+    } else {
+      W2lSerializer::save(outputfile, config, network, criterion);
+    }
   } catch (const std::exception& ex) {
-    LOG(FATAL) << "Error while saving models: " << ex.what();
-  }
-}
-
-void LogHelper::saveProposalModel(
-    const std::unordered_map<std::string, std::string>& config,
-    std::shared_ptr<fl::Module> network,
-    std::shared_ptr<SequenceCriterion> criterion) {
-  if (!isMaster_) {
-    return;
+    LOG(FATAL) << "Error while saving models to " + outputfile + ": "
+               << ex.what();
   }
 
-  try {
-    std::string filename = getRunFile("prop.bin", runIdx_, runPath_);
-    W2lSerializer::save(filename, config, network, criterion);
-  } catch (const std::exception& ex) {
-    LOG(FATAL) << "Error while saving proposal models: " << ex.what();
-  }
-}
-
-std::string LogHelper::saveWorkerProposalModel(
-    const std::unordered_map<std::string, std::string>& config,
-    std::shared_ptr<fl::Module> network,
-    std::shared_ptr<SequenceCriterion> criterion,
-    int worldRank) {
-  std::string basename = format("prop_worker%03d.bin", worldRank);
-  std::string path = getRunFile(basename, runIdx_, runPath_);
-  try {
-    W2lSerializer::save(path, config, network, criterion);
-  } catch (const std::exception& ex) {
-    LOG(FATAL) << "Error while saving proposal models: " << ex.what();
-  }
-  return path;
+  return outputfile;
 }
 
 void LogHelper::logAndSaveModel(
@@ -148,7 +122,6 @@ void LogHelper::logAndSaveModel(
     const std::unordered_map<std::string, std::string>& config,
     std::shared_ptr<fl::Module> network,
     std::shared_ptr<SequenceCriterion> criterion,
-    std::shared_ptr<LMCritic> lmcrit,
     std::shared_ptr<fl::FirstOrderOptimizer> netoptim,
     const std::unordered_map<std::string, double>& logFields) {
   int iter = logOnEpoch_ ? std::stoi(config.at(kEpoch))
@@ -159,14 +132,15 @@ void LogHelper::logAndSaveModel(
   }
 
   logStatus(meters, iter, logFields);
-  saveModel(tag, config, network, criterion, lmcrit, netoptim);
+  saveModel("model_" + tag + ".bin", config, network, criterion, netoptim);
 
   for (auto& s : meters.valid) {
     double verr = s.second.edits[kTarget].value()[0];
     auto sit = validminerrs_.find(s.first);
     if (sit == validminerrs_.end() || sit->second > verr) {
       validminerrs_[s.first] = verr;
-      saveModel(s.first, config, network, criterion, lmcrit, netoptim);
+      saveModel(
+          "model_" + s.first + ".bin", config, network, criterion, netoptim);
     }
   }
 }
@@ -191,9 +165,8 @@ std::string LogHelper::formatStatus(
 
   auto insertSSLDatasetMeters = [&insertItem](
                                     SSLDatasetMeters& meter, std::string tag) {
-    for (auto& m : meter.losses) {
-      insertItem(
-          tag + "-loss-" + m.first, format("%10.5f", m.second.value()[0]));
+    for (auto& m : meter.values) {
+      insertItem(tag + "-" + m.first, format("%10.5f", m.second.value()[0]));
     }
     for (auto& m : meter.edits) {
       insertItem(
@@ -213,8 +186,6 @@ std::string LogHelper::formatStatus(
   }
 
   insertItem("lr", headerOnly ? "" : format("%4.6lf", logFields.at("lr")));
-  insertItem(
-      "lmcrit-t", headerOnly ? "" : format("%4.6lf", logFields.at("lmcrit-t")));
 
   int rt = meters.timer[kRuntime].value();
   insertItem(
@@ -226,6 +197,10 @@ std::string LogHelper::formatStatus(
       continue;
     }
     insertItem(m.first + "(ms)", format("%.2f", m.second.value() * 1000));
+  }
+
+  for (auto& m : meters.values) {
+    insertItem("train-" + m.first, format("%10.5f", m.second.value()[0]));
   }
 
   insertSSLDatasetMeters(meters.train, "train");
@@ -264,6 +239,9 @@ void syncMeter<SSLTrainMeters>(SSLTrainMeters& meters) {
   for (auto& m : meters.timer) {
     syncMeter(m.second);
   }
+  for (auto& m : meters.values) {
+    syncMeter(m.second);
+  }
   syncMeter(meters.train);
   for (auto& m : meters.valid) {
     syncMeter(m.second);
@@ -275,16 +253,20 @@ void syncMeter<SSLDatasetMeters>(SSLDatasetMeters& meters) {
   for (auto& m : meters.edits) {
     syncMeter(m.second);
   }
-  for (auto& m : meters.losses) {
+  for (auto& m : meters.values) {
     syncMeter(m.second);
   }
 }
 
-void resetTimeStatMeters(SSLTrainMeters& meters) {
+void resetTrainMeters(SSLTrainMeters& meters) {
   for (auto& m : meters.timer) {
     m.second.reset();
   }
+  for (auto& m : meters.values) {
+    m.second.reset();
+  }
   meters.stats.reset();
+  resetDatasetMeters(meters.train);
 }
 
 void stopTimeMeters(SSLTrainMeters& meters) {
@@ -297,9 +279,18 @@ void resetDatasetMeters(SSLDatasetMeters& meters) {
   for (auto& m : meters.edits) {
     m.second.reset();
   }
-  for (auto& m : meters.losses) {
+  for (auto& m : meters.values) {
     m.second.reset();
   }
+}
+
+double avgValidErr(SSLTrainMeters& meters) {
+  double err = 0.0;
+  for (auto& s : meters.valid) {
+    err += s.second.edits[kTarget].value()[0];
+  }
+  err /= meters.valid.size();
+  return err;
 }
 
 } // namespace w2l

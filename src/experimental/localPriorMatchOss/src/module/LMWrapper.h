@@ -15,14 +15,13 @@
 
 namespace w2l {
 
-class LMCritic : public fl::Container {
+// a simple wrapper for LMs trained with a different dictionary
+class LMWrapper : public fl::Container {
  public:
-  LMCritic(
+  LMWrapper(
       std::shared_ptr<fl::Module> network,
       const std::vector<int>& dictIndexMap,
-      int numDictPadding,
-      int startIndex,
-      int unkIndex = -1);
+      int startIndex);
 
   std::vector<fl::Variable> forward(
       const std::vector<fl::Variable>& inputs) override;
@@ -31,25 +30,17 @@ class LMCritic : public fl::Container {
 
  private:
   af::array dictIndexMap_;
-  fl::Variable startProb_;
-  int numDictPadding_, unkIndex_;
+  int startIndex_;
 
-  FL_SAVE_LOAD_WITH_BASE(
-      Container,
-      dictIndexMap_,
-      startProb_,
-      numDictPadding_,
-      unkIndex_)
+  FL_SAVE_LOAD_WITH_BASE(Container, dictIndexMap_, startIndex_)
 
-  LMCritic() = default;
+  LMWrapper() = default;
 
-  fl::Variable preprocessInput(fl::Variable input);
-
-  std::shared_ptr<fl::Module> lmNetwork() const {
+  std::shared_ptr<fl::Module> lm() const {
     return module(0);
   }
 };
 
 } // namespace w2l
 
-CEREAL_REGISTER_TYPE(w2l::LMCritic)
+CEREAL_REGISTER_TYPE(w2l::LMWrapper)

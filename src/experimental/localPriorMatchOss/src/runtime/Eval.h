@@ -27,7 +27,6 @@ void evalOutput(
 void evalDataset(
     std::shared_ptr<fl::Module> ntwrk,
     std::shared_ptr<SequenceCriterion> crit,
-    std::shared_ptr<fl::Module> lmcrit,
     std::shared_ptr<W2lDataset> testds,
     SSLDatasetMeters& mtrs,
     const Dictionary& dict);
@@ -35,7 +34,6 @@ void evalDataset(
 void runEval(
     std::shared_ptr<fl::Module> network,
     std::shared_ptr<SequenceCriterion> criterion,
-    std::shared_ptr<fl::Module> lmcrit,
     const std::unordered_map<std::string, std::shared_ptr<W2lDataset>>& ds,
     SSLTrainMeters& meters,
     const Dictionary& dict);
