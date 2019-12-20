@@ -26,15 +26,13 @@
 #include "libraries/common/Dictionary.h"
 #include "libraries/decoder/LexiconFreeDecoder.h"
 #include "libraries/decoder/Seq2SeqDecoder.h"
-#include "libraries/decoder/TokenLMDecoder.h"
-#include "libraries/decoder/WordLMDecoder.h"
 #include "libraries/lm/ConvLM.h"
 #include "libraries/lm/KenLM.h"
 #include "module/module.h"
-#include "runtime/runtime.h"
 #include "runtime/Data.h"
 #include "runtime/Logger.h"
 #include "runtime/Serial.h"
+#include "runtime/runtime.h"
 
 using namespace w2l;
 
@@ -58,15 +56,15 @@ int main(int argc, char** argv) {
     LOG(FATAL) << "Error opening decode result file: " << outpath;
   }
 
-  auto writeResult = [&](
-      const std::string& type, 
-      const std::vector<int>& path, 
-      float score, 
-      int rank) {
-    outStream << type << " Rank=" << rank 
-              << " ASR_Score=" << score << " ";
-    for (int i=0; i<path.size(); i++) {
-      if (i != 0) { outStream << ","; }
+  auto writeResult = [&](const std::string& type,
+                         const std::vector<int>& path,
+                         float score,
+                         int rank) {
+    outStream << type << " Rank=" << rank << " ASR_Score=" << score << " ";
+    for (int i = 0; i < path.size(); i++) {
+      if (i != 0) {
+        outStream << ",";
+      }
       outStream << path[i];
     }
     outStream << std::endl;
@@ -396,15 +394,17 @@ int main(int argc, char** argv) {
       }
 
       if (FLAGS_decodertype == "wrd") {
-        decoder.reset(new WordLMDecoder(
+        decoder.reset(new LexiconDecoder(
             decoderOpt,
             trie,
             localLm,
             silIdx,
             blankIdx,
             unkWordIdx,
-            transition));
-        LOG(INFO) << "[Decoder] Decoder with word-LM loaded in thread: " << tid;
+            transition,
+            false));
+        LOG(INFO) << "[Decoder] Lexicon decoder with word-LM loaded in thread: "
+                  << tid;
       } else if (FLAGS_decodertype == "tkn") {
         if (criterionType == CriterionType::S2S) {
           af::setDevice(tid);
@@ -466,14 +466,14 @@ int main(int argc, char** argv) {
         auto N = emissionSet.emissionN;
 
         remapLabels(tokenTarget, tokenDict);
-        writeResult("Tgt", tokenTarget, -999.999, -1);  // skip ASR score
+        writeResult("Tgt", tokenTarget, -999.999, -1); // skip ASR score
 
         // DecodeResult
         auto results = decoder->decode(emission.data(), T, N);
-        for (int r=0; r<results.size(); ++r) {
+        for (int r = 0; r < results.size(); ++r) {
           auto tokenHyp = validateIdx(results[r].tokens, -1);
           remapLabels(tokenHyp, tokenDict);
-          writeResult("Hyp", tokenHyp, results[r].score, r+1);
+          writeResult("Hyp", tokenHyp, results[r].score, r + 1);
         }
 
         // Cleanup predictions
@@ -583,8 +583,10 @@ int main(int argc, char** argv) {
 
   // std::stringstream buffer;
   // buffer << "------\n";
-  // buffer << "[Decode " << FLAGS_test << " (" << totalSamples << " samples) in "
-  //        << timer.value() << "s (actual decoding time " << std::setprecision(3)
+  // buffer << "[Decode " << FLAGS_test << " (" << totalSamples << " samples) in
+  // "
+  //        << timer.value() << "s (actual decoding time " <<
+  //        std::setprecision(3)
   //        << totalTime / totalSamples
   //        << "s/sample) -- WER: " << std::setprecision(6) << totalWer
   //        << ", LER: " << totalLer << "]" << std::endl;
