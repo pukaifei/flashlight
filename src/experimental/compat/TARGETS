@@ -3,6 +3,7 @@ load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
 cpp_library(
     name = "compat",
     srcs = [
+        "Compat.cpp",
         "TransformerLayer.cpp",
     ],
     headers = [
