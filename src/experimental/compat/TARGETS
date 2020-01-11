@@ -4,10 +4,12 @@ cpp_library(
     name = "compat",
     srcs = [
         "Compat.cpp",
+        "PositionEmbeddingLayer.cpp",
         "TransformerLayer.cpp",
     ],
     headers = [
         "Compat.h",
+        "PositionEmbeddingLayer.h",
         "TransformerLayer.h",
     ],
     deps = [

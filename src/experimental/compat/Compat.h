@@ -1,3 +1,4 @@
+#include "experimental/compat/PositionEmbeddingLayer.h"
 #include "experimental/compat/TransformerLayer.h"
 
 namespace w2l {
