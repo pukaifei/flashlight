@@ -8,8 +8,6 @@
 
 #include "experimental/localPriorMatchOss/src/runtime/Defines.h"
 
-#include "criterion/Defines.h"
-
 namespace w2l {
 
 // data scheduler
