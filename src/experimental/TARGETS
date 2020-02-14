@@ -5,11 +5,9 @@ cpp_binary(
     name = "align_cpp",
     srcs = [
         "Align.cpp",
-        "ForceAlignment.cpp",
     ],
     headers = [
-        "AlignUtils.h",
-        "ForceAlignment.h",
+        "alignment/Utils.h",
     ],
     deps = [
         "//deeplearning/projects/wav2letter/src/common:common",
@@ -31,7 +29,7 @@ cpp_unittest(
         "AlignTest.cpp",
     ],
     headers = [
-        "AlignUtils.h",
+        "alignment/Utils.h",
     ],
     tags = ["serialize"],  # run GPU tests sequentially to avoid OOMs
     deps = [

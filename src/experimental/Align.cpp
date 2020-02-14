@@ -6,27 +6,18 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <cereal/archives/binary.hpp>
-#include <cereal/types/vector.hpp>
-#include <flashlight/flashlight.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-#include "common/Defines.h"
-#include "common/FlashlightUtils.h"
-#include "common/Transforms.h"
 #include "criterion/criterion.h"
-#include "data/Featurize.h"
-#include "data/W2lDataset.h"
-#include "fb/W2lEverstoreDataset.h"
 #include "libraries/common/Dictionary.h"
 #include "module/module.h"
 #include "runtime/runtime.h"
 
-#include "experimental/AlignUtils.h"
-#include "experimental/ForceAlignment.h"
+#include "alignment/Utils.h"
 
 using namespace w2l;
+using namespace w2l::alignment;
 
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
@@ -70,11 +61,20 @@ int main(int argc, char** argv) {
   LOG(INFO) << "[Network] Updating flags from config file: " << FLAGS_am;
   gflags::ReadFlagsFromString(flags->second, gflags::GetArgv0(), true);
   gflags::ParseCommandLineFlags(&argc, &argv, false);
+  if (!FLAGS_flagsfile.empty()) {
+    LOG(INFO) << "Reading flags from file " << FLAGS_flagsfile;
+    gflags::ReadFromFlagsFile(FLAGS_flagsfile, argv[0], true);
+  }
 
   LOG(INFO) << "Gflags after parsing \n" << serializeGflags("; ");
 
   /* ===================== Create Dictionary ===================== */
-  Dictionary tokenDict(FLAGS_tokens);
+  auto dictPath = pathsConcat(FLAGS_tokensdir, FLAGS_tokens);
+  LOG(INFO) << "Loading dictionary from " << dictPath;
+  if (dictPath.empty() || !fileExists(dictPath)) {
+    throw std::invalid_argument("Invalid dictionary filepath specified.");
+  }
+  Dictionary tokenDict(dictPath);
   // Setup-specific modifications
   for (int64_t r = 1; r <= FLAGS_replabel; ++r) {
     tokenDict.addEntry(std::to_string(r));
@@ -98,48 +98,35 @@ int main(int argc, char** argv) {
   alignFile.open(alignFilePath);
   if (!alignFile.is_open() || !alignFile.good()) {
     LOG(FATAL) << "Error opening log file";
+  } else {
+    LOG(INFO) << "Writing alignment to: " << alignFilePath;
   }
+
+  LexiconMap lexicon;
+  if (!FLAGS_lexicon.empty()) {
+    lexicon = loadWords(FLAGS_lexicon, FLAGS_maxword);
+  }
+
+  LOG(INFO) << "Loaded lexicon";
 
   auto writeLog = [&](const std::string& logStr) {
     std::lock_guard<std::mutex> lock(write_mutex);
     alignFile << logStr;
+    if (FLAGS_show) {
+      std::cout << logStr;
+    }
   };
 
   /* ===================== Create Dataset ===================== */
   int worldRank = 0;
   int worldSize = 1;
   std::shared_ptr<W2lDataset> ds;
-  LexiconMap dummyLexicon;
-  if (FLAGS_everstoredb) {
-    W2lEverstoreDataset::init(); // Required for everstore client
+  ds = createDataset(
+      FLAGS_test, dicts, lexicon, FLAGS_batchsize, worldRank, worldSize);
 
-    ds = std::make_shared<W2lEverstoreDataset>(
-        FLAGS_test,
-        dicts,
-        dummyLexicon,
-        FLAGS_batchsize,
-        worldRank,
-        worldSize,
-        true /* fallback2Ltr */,
-        false /* skipUnk */,
-        FLAGS_datadir);
-  } else {
-    ds = std::make_shared<W2lListFilesDataset>(
-        FLAGS_test,
-        dicts,
-        dummyLexicon,
-        FLAGS_batchsize,
-        worldRank,
-        worldSize,
-        true /* fallback2Ltr */,
-        false /* skipUnk */,
-        FLAGS_datadir);
-  }
+  LOG(INFO) << "[Dataset] Dataset loaded";
 
-  LOG(INFO) << "[Dataset] Dataset loaded.";
-
-  auto transition = afToVector<float>(criterion->params()[0].array());
-  w2l::ForceAlignment fa(transition);
+  auto postprocess_fn = getWordSegmenter(criterion);
 
   int batches = 0;
   fl::TimeMeter alignMtr;
@@ -148,35 +135,36 @@ int main(int argc, char** argv) {
 
   for (auto& sample : *ds) {
     fwdMtr.resume();
-    auto rawEmission = network->forward({fl::input(sample[kInputIdx])}).front();
+    const auto input = fl::input(sample[kInputIdx]);
+    std::vector<fl::Variable> rawEmissions = network->forward({input});
+    fl::Variable rawEmission;
+    if (!rawEmissions.empty()) {
+      rawEmission = rawEmissions.front();
+    } else {
+      LOG(ERROR) << "Network did not produce any outputs";
+    }
+
     fwdMtr.stop();
     alignMtr.resume();
-    auto bestPaths = fa.align(rawEmission, fl::input(sample[kTargetIdx]));
+    auto bestPaths =
+        criterion->viterbiPath(rawEmission.array(), sample[kTargetIdx]);
     alignMtr.stop();
-
     parseMtr.resume();
-#pragma omp parallel for num_threads(bestPaths.size())
-    for (auto b = 0; b < bestPaths.size(); b++) {
-      auto sampleIdsStr = readSampleIds(sample[kSampleIdx]);
-      auto rawLtrTarget = afToVector<int>(sample[kTargetIdx]);
-      for (auto& t : rawLtrTarget) {
-        // ignore padded letter targets
-        if (t == -1) {
-          break;
-        }
-      }
 
-      std::vector<std::string> alignedLetters;
-      auto path = bestPaths[b];
-      for (auto& p : path) {
-        auto ltr = dicts[kTargetIdx].getEntry(p);
-        alignedLetters.emplace_back(ltr);
-      }
-      auto alignedWords = getAlignedWords(alignedLetters, FLAGS_replabel);
+    const double timeScale =
+        static_cast<double>(input.dims(0)) / rawEmission.dims(1);
 
-      // write alignment output to align file in CTM format
+    const std::vector<std::vector<std::string>> tokenPaths =
+        mapIndexToToken(bestPaths, dicts);
+    const std::vector<std::string> sampleIdsStr =
+        readSampleIds(sample[kSampleIdx]);
+
+    for (int b = 0; b < tokenPaths.size(); b++) {
       if (sampleIdsStr.size() > b) {
-        auto ctmString = getCTMFormat(alignedWords);
+        const std::vector<std::string>& path = tokenPaths[b];
+        const std::vector<AlignedWord> segmentation =
+            postprocess_fn(path, FLAGS_replabel, msPerFrame * timeScale);
+        const std::string ctmString = getCTMFormat(segmentation);
         std::stringstream buffer;
         buffer << sampleIdsStr[b] << "\t" << ctmString << "\n";
         writeLog(buffer.str());
