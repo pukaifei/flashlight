@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "experimental/localPriorMatchOss/src/runtime/Init.h"
+#include "recipes/models/local_prior_match/src/runtime/Init.h"
 
 #include <tuple>
 #include <vector>
@@ -15,8 +15,8 @@
 #include <glog/logging.h>
 
 #include "common/FlashlightUtils.h"
-#include "experimental/localPriorMatchOss/src/runtime/Defines.h"
-#include "experimental/localPriorMatchOss/src/runtime/Utils.h"
+#include "recipes/models/local_prior_match/src/runtime/Defines.h"
+#include "recipes/models/local_prior_match/src/runtime/Utils.h"
 #include "runtime/Serial.h"
 
 namespace w2l {

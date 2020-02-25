@@ -6,14 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "experimental/localPriorMatchOss/src/runtime/Logging.h"
+#include "recipes/models/local_prior_match/src/runtime/Logging.h"
 
 #include <cereal/archives/json.hpp>
 #include <cereal/types/unordered_map.hpp>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-#include "experimental/localPriorMatchOss/src/runtime/Defines.h"
+#include "recipes/models/local_prior_match/src/runtime/Defines.h"
 #include "runtime/Serial.h"
 
 namespace w2l {

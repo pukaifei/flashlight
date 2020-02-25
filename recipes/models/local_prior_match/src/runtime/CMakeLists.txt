@@ -24,3 +24,10 @@ target_link_libraries(
   data
   module
   )
+
+target_include_directories(
+  runtime_lpm_oss
+  INTERFACE
+  ${GLOG_INCLUDE_DIRS}
+  ${PROJECT_SOURCE_DIR}/../../..
+  )

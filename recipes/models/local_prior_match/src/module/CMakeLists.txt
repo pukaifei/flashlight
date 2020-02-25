@@ -16,3 +16,9 @@ target_link_libraries(
   INTERFACE
   module # inherit all properties from base interface
   )
+
+target_include_directories(
+  module_lpm_oss
+  INTERFACE
+  ${PROJECT_SOURCE_DIR}/../../..
+  )

@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "experimental/localPriorMatchOss/src/module/LMWrapper.h"
+#include "recipes/models/local_prior_match/src/module/LMWrapper.h"
 
 using namespace fl;
 

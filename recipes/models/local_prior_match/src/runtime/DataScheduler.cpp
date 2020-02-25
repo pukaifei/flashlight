@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "experimental/localPriorMatchOss/src/runtime/DataScheduler.h"
+#include "recipes/models/local_prior_match/src/runtime/DataScheduler.h"
 
 #include <algorithm>
 #include <limits>
@@ -16,7 +16,7 @@
 #include <glog/logging.h>
 
 #include "common/Defines.h"
-#include "experimental/localPriorMatchOss/src/runtime/Defines.h"
+#include "recipes/models/local_prior_match/src/runtime/Defines.h"
 #include "runtime/Logger.h"
 
 namespace w2l {

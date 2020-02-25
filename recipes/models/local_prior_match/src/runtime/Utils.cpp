@@ -7,12 +7,12 @@
  */
 #include <arrayfire.h>
 
-#include "experimental/localPriorMatchOss/src/runtime/Utils.h"
+#include "recipes/models/local_prior_match/src/runtime/Utils.h"
 
 #include "common/Defines.h"
 #include "common/Transforms.h"
 #include "common/Utils.h"
-#include "experimental/localPriorMatchOss/src/runtime/Defines.h"
+#include "recipes/models/local_prior_match/src/runtime/Defines.h"
 
 namespace w2l {
 

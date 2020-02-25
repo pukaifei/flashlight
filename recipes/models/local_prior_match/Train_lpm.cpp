@@ -19,10 +19,10 @@
 #include "common/FlashlightUtils.h"
 #include "criterion/criterion.h"
 #include "data/Featurize.h"
-#include "experimental/localPriorMatchOss/src/module/LMWrapper.h"
-#include "experimental/localPriorMatchOss/src/runtime/runtime.h"
 #include "libraries/common/Dictionary.h"
 #include "module/module.h"
+#include "recipes/models/local_prior_match/src/module/LMWrapper.h"
+#include "recipes/models/local_prior_match/src/runtime/runtime.h"
 #include "runtime/runtime.h"
 
 using namespace w2l;

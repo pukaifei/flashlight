@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "experimental/localPriorMatchOss/src/runtime/Defines.h"
+#include "recipes/models/local_prior_match/src/runtime/Defines.h"
 
 namespace w2l {
 
@@ -46,6 +46,6 @@ DEFINE_string(
 DEFINE_string(
     propupdate,
     kBetter,
-    "Update rule for proposal model (never,always,better)");
+    "Update rule for proposal model (never, always, better)");
 
 } // namespace w2l

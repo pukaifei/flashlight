@@ -6,14 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "experimental/localPriorMatchOss/src/runtime/Eval.h"
+#include "recipes/models/local_prior_match/src/runtime/Eval.h"
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include "common/FlashlightUtils.h"
 #include "common/Transforms.h"
-#include "experimental/localPriorMatchOss/src/runtime/Logging.h"
+#include "recipes/models/local_prior_match/src/runtime/Logging.h"
 
 namespace w2l {
 

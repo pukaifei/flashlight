@@ -12,8 +12,8 @@
 
 #include "criterion/criterion.h"
 #include "data/W2lDataset.h"
-#include "experimental/localPriorMatchOss/src/runtime/Logging.h"
 #include "libraries/common/Dictionary.h"
+#include "recipes/models/local_prior_match/src/runtime/Logging.h"
 #include "runtime/runtime.h"
 
 namespace w2l {
