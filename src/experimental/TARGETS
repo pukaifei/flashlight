@@ -31,7 +31,10 @@ cpp_unittest(
     headers = [
         "alignment/Utils.h",
     ],
-    tags = ["serialize"],  # run GPU tests sequentially to avoid OOMs
+    tags = [
+        # run GPU tests sequentially to avoid OOMs
+        "serialize",
+    ],
     deps = [
         "//deeplearning/projects/wav2letter/src/common:common",
     ],

@@ -10,6 +10,7 @@ cpp_unittest(
         "AudioAugmenterTest.cpp",
     ],
     compiler_flags = datadir_flags,
+    tags = ["re_opts:platform=LINUX_GPU,size=XXLARGE"],
     deps = [
         "//deeplearning/projects/wav2letter/src/common:common",
         "//deeplearning/projects/wav2letter/src/data:data",

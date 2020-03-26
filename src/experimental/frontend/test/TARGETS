@@ -3,6 +3,7 @@ cpp_unittest(
     srcs = [
         "FrontendTest.cpp",
     ],
+    tags = ["re_opts:platform=LINUX_GPU,size=XXLARGE"],
     deps = [
         "//deeplearning/projects/wav2letter/src/experimental/frontend:frontend",
         "//deeplearning/projects/wav2letter/src/module:module",
