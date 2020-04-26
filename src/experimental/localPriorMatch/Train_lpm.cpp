@@ -27,18 +27,16 @@
 
 using namespace w2l;
 
-
-
 /* meters for memory tracing */
-std::map<std::string, std::vector<size_t>>
-  memMeters({{"0-start", {0, 0, 0, 0}},
-             {"1-encfwd", {0, 0, 0, 0}},
-             {"2a-decfwd", {0, 0, 0, 0}},
-             {"2b-decbs", {0, 0, 0, 0}},
-             {"3-lmfwd", {0, 0, 0, 0}},
-             {"4-bmfwd", {0, 0, 0, 0}},
-             {"5-zgrad", {0, 0, 0, 0}},
-             {"6-bwd", {0, 0, 0, 0}}});
+std::map<std::string, std::vector<size_t>> memMeters(
+    {{"0-start", {0, 0, 0, 0}},
+     {"1-encfwd", {0, 0, 0, 0}},
+     {"2a-decfwd", {0, 0, 0, 0}},
+     {"2b-decbs", {0, 0, 0, 0}},
+     {"3-lmfwd", {0, 0, 0, 0}},
+     {"4-bmfwd", {0, 0, 0, 0}},
+     {"5-zgrad", {0, 0, 0, 0}},
+     {"6-bwd", {0, 0, 0, 0}}});
 
 void updateMemStat(std::string name) {
   size_t abytes = 0, abuffs = 0, lbytes = 0, lbuffs = 0;
@@ -47,22 +45,26 @@ void updateMemStat(std::string name) {
 }
 
 void resetMemStat() {
-  for (auto& m : memMeters) { m.second = {0, 0, 0, 0}; }
+  for (auto& m : memMeters) {
+    m.second = {0, 0, 0, 0};
+  }
 }
 
-std::string sprintMemStat(bool buff=true) {
+std::string sprintMemStat(bool buff = true) {
   std::ostringstream os;
   size_t offset = buff ? 1 : 0;
   for (auto& m : memMeters) {
-    os << m.first << ":" << m.second[2+offset]
-       << "/" << m.second[offset] << " ";
+    os << m.first << ":" << m.second[2 + offset] << "/" << m.second[offset]
+       << " ";
   }
   return os.str();
 }
 
 double avgValidErr(SSLTrainMeters& meters) {
   double err;
-  for (auto& s : meters.valid) { err += s.second.edits[kTarget].value()[0]; }
+  for (auto& s : meters.valid) {
+    err += s.second.edits[kTarget].value()[0];
+  }
   err /= meters.valid.size();
   return err;
 }
@@ -99,7 +101,11 @@ int main(int argc, char** argv) {
 
   std::shared_ptr<fl::Reducer> reducer = nullptr;
   if (FLAGS_enable_distributed) {
-    initDistributed(FLAGS_world_rank, FLAGS_world_size, FLAGS_rndv_filepath);
+    initDistributed(
+        FLAGS_world_rank,
+        FLAGS_world_size,
+        FLAGS_max_devices_per_node,
+        FLAGS_rndv_filepath);
     reducer = std::make_shared<fl::CoalescingReducer>(
         1.0 / fl::getWorldSize(), true, true);
   }
@@ -193,7 +199,8 @@ int main(int argc, char** argv) {
     propcrit = std::dynamic_pointer_cast<Seq2SeqCriterion>(base_propcrit);
   } else {
     std::shared_ptr<fl::FirstOrderOptimizer> propnetoptim;
-    W2lSerializer::load(propPath, propcfg, propnet, base_propcrit, propnetoptim);
+    W2lSerializer::load(
+        propPath, propcfg, propnet, base_propcrit, propnetoptim);
     propcrit = std::dynamic_pointer_cast<Seq2SeqCriterion>(base_propcrit);
   }
 
@@ -333,7 +340,7 @@ int main(int argc, char** argv) {
         af::sync();
         paths.clear();
         hypoNums.clear();
-        int bs  = isPairedData ? FLAGS_batchsize : FLAGS_unpairedBatchsize;
+        int bs = isPairedData ? FLAGS_batchsize : FLAGS_unpairedBatchsize;
 
         meters.timer[kTimer].incUnit();
         meters.timer[kSampleTimer].stopAndIncUnit();
@@ -383,8 +390,8 @@ int main(int argc, char** argv) {
         fl::Variable s2sent;
         if (isPairedData) {
           meters.timer[kCritFwdTimer].resume();
-          loss = criterion->forward(
-              {output, fl::noGrad(sample[kTargetIdx])}).front();
+          loss = criterion->forward({output, fl::noGrad(sample[kTargetIdx])})
+                     .front();
           updateMemStat("2a-decfwd");
 
           if (af::anyTrue<bool>(af::isNaN(loss.array()))) {
@@ -394,8 +401,8 @@ int main(int argc, char** argv) {
           meters.timer[kCritFwdTimer].stopAndIncUnit();
         } else if (FLAGS_pmType == kOracle) {
           meters.timer[kBeamFwdTimer].resume();
-          loss = criterion->forward(
-              {output, fl::noGrad(sample[kTargetIdx])}).front();
+          loss = criterion->forward({output, fl::noGrad(sample[kTargetIdx])})
+                     .front();
           updateMemStat("2a-decfwd");
 
           if (af::anyTrue<bool>(af::isNaN(loss.array()))) {
@@ -409,7 +416,8 @@ int main(int argc, char** argv) {
 
           auto propoutput =
               propnet->forward({fl::input(sample[kInputIdx])}).front();
-          std::tie(paths, hypoNums) = batchBeamSearch(propoutput, propcrit, dicts[kTargetIdx].getIndex(kEosToken));
+          std::tie(paths, hypoNums) = batchBeamSearch(
+              propoutput, propcrit, dicts[kTargetIdx].getIndex(kEosToken));
 
           meters.timer[kBeamTimer].stopAndIncUnit();
           updateMemStat("2b-decbs");
@@ -422,8 +430,10 @@ int main(int argc, char** argv) {
           }
           auto refLen = afToVector<int>(getTargetLength(
               sample[kTargetIdx], dicts[kTargetIdx].getIndex(kEosToken)));
-          std::tie(paths, hypoNums) = filterBeamByLength(paths, hypoNums, refLen);
-          auto hypoNumsArr = af::array(af::dim4(hypoNums.size()), hypoNums.data());
+          std::tie(paths, hypoNums) =
+              filterBeamByLength(paths, hypoNums, refLen);
+          auto hypoNumsArr =
+              af::array(af::dim4(hypoNums.size()), hypoNums.data());
           af::array remIdx = af::sort(af::where(hypoNumsArr));
           int remBs = remIdx.dims()[0];
 
@@ -431,8 +441,8 @@ int main(int argc, char** argv) {
             LOG(INFO) << "WARNING : using a made-up loss because remBs=0";
             // create a made-up loss with 0 value that is a function of
             // parameters to train, so the grad will be all 0.
-            loss = criterion->forward(
-                {output, fl::noGrad(sample[kTargetIdx])}).front();
+            loss = criterion->forward({output, fl::noGrad(sample[kTargetIdx])})
+                       .front();
             loss = 0.0 * loss;
           } else {
             output = output(af::span, af::span, remIdx);
@@ -461,31 +471,62 @@ int main(int argc, char** argv) {
             meters.timer[kBeamFwdTimer].resume();
             auto s2sLogprob = computeS2SLogprob(
                 paths, hypoNums, output, criterion, dicts[kTargetIdx]);
-            auto procS2SLogprob = postprocS2SLogprob(
-                s2sLogprob, paths, hypoNums);
+            auto procS2SLogprob =
+                postprocS2SLogprob(s2sLogprob, paths, hypoNums);
             updateMemStat("4-bmfwd");
 
-            loss = computePriorMatchingLoss(procLmLogprob, procS2SLogprob, hypoNums);
+            loss = computePriorMatchingLoss(
+                procLmLogprob, procS2SLogprob, hypoNums);
             lment = entropy(procLmLogprob, hypoNums);
             s2sent = entropy(procS2SLogprob, hypoNums);
             meters.timer[kBeamFwdTimer].stopAndIncUnit();
 
             /* debugging messeage */
             if (FLAGS_debug) {
-              LOG(INFO) << "#Hypos=" << paths.size()
-                        << " (" << stringify<int>(hypoNums) << ")" << "\n"
-                        << af::toString("LM log-prob : ", lmLogprob.array(), 4, false)
-                        << af::toString("LM log-prob (processed) : ", procLmLogprob.array(), 4, false)
-                        << af::toString("LM prob (re-normalized) : ", adjustProb(procLmLogprob, hypoNums, true, true).array(), 4, false)
-                        << af::toString("LM advantage : ", computeAdvantage(lmLogprob, hypoNums, FLAGS_advmargin).array(), 4, false)
-                        << af::toString("LM prob entropy : ", lment.array(), 4, false)
-                        << af::toString("S2S log-prob : ", s2sLogprob.array(), 4, false)
-                        << af::toString("S2S log-prob (processed) : ", procS2SLogprob.array(), 4, false)
-                        << af::toString("S2S linear-prob : ", fl::exp(s2sLogprob).array(), 4, false)
-                        << af::toString("S2S linear-prob (processed) : ", fl::exp(procS2SLogprob).array(), 4, false)
-                        << af::toString("S2S prob entropy : ", s2sent.array(), 4, false)
-                        << af::toString("PM loss", loss.array(), 4, false)
-                        << std::endl;
+              LOG(INFO)
+                  << "#Hypos=" << paths.size() << " ("
+                  << stringify<int>(hypoNums) << ")"
+                  << "\n"
+                  << af::toString("LM log-prob : ", lmLogprob.array(), 4, false)
+                  << af::toString(
+                         "LM log-prob (processed) : ",
+                         procLmLogprob.array(),
+                         4,
+                         false)
+                  << af::toString(
+                         "LM prob (re-normalized) : ",
+                         adjustProb(procLmLogprob, hypoNums, true, true)
+                             .array(),
+                         4,
+                         false)
+                  << af::toString(
+                         "LM advantage : ",
+                         computeAdvantage(lmLogprob, hypoNums, FLAGS_advmargin)
+                             .array(),
+                         4,
+                         false)
+                  << af::toString("LM prob entropy : ", lment.array(), 4, false)
+                  << af::toString(
+                         "S2S log-prob : ", s2sLogprob.array(), 4, false)
+                  << af::toString(
+                         "S2S log-prob (processed) : ",
+                         procS2SLogprob.array(),
+                         4,
+                         false)
+                  << af::toString(
+                         "S2S linear-prob : ",
+                         fl::exp(s2sLogprob).array(),
+                         4,
+                         false)
+                  << af::toString(
+                         "S2S linear-prob (processed) : ",
+                         fl::exp(procS2SLogprob).array(),
+                         4,
+                         false)
+                  << af::toString(
+                         "S2S prob entropy : ", s2sent.array(), 4, false)
+                  << af::toString("PM loss", loss.array(), 4, false)
+                  << std::endl;
 
               LOG(INFO) << "===== PATHS ====";
               for (auto& path : paths) {
@@ -497,27 +538,27 @@ int main(int argc, char** argv) {
               std::vector<int> onlineHypoNums;
 
               LOG(INFO) << "===== PATHS from online model ====";
-              std::tie(onlinePaths, onlineHypoNums) =
-                batchBeamSearch(output, criterion, dicts[kTargetIdx].getIndex(kEosToken));
+              std::tie(onlinePaths, onlineHypoNums) = batchBeamSearch(
+                  output, criterion, dicts[kTargetIdx].getIndex(kEosToken));
               for (auto& path : onlinePaths) {
                 auto wrdVec = wrdIdx2Wrd(path, dicts[kTargetIdx]);
                 LOG(INFO) << stringify<std::string>(wrdVec);
               }
 
               LOG(INFO) << "===== PATHS from online encoder ====";
-              std::tie(onlinePaths, onlineHypoNums) =
-                batchBeamSearch(output, propcrit, dicts[kTargetIdx].getIndex(kEosToken));
+              std::tie(onlinePaths, onlineHypoNums) = batchBeamSearch(
+                  output, propcrit, dicts[kTargetIdx].getIndex(kEosToken));
               for (auto& path : onlinePaths) {
                 auto wrdVec = wrdIdx2Wrd(path, dicts[kTargetIdx]);
                 LOG(INFO) << stringify<std::string>(wrdVec);
               }
-
             }
 
             for (auto& path : paths) {
               meters.train.losses[kLen].add(static_cast<double>(path.size()));
             }
-            meters.train.losses[kNumHypos].add(static_cast<double>(paths.size()));
+            meters.train.losses[kNumHypos].add(
+                static_cast<double>(paths.size()));
             meters.train.losses[kLMEnt].add(lment.array());
             meters.train.losses[kLMScore].add(lmLogprob.array());
             meters.train.losses[kS2SEnt].add(s2sent.array());
@@ -596,10 +637,11 @@ int main(int argc, char** argv) {
                          << " Iter=" << scheduleIter
                          << " isPairedData=" << isPairedData
                          << " AvgLoss=" << fl::mean(loss, {0}).scalar<float>()
-                         << " MinLen=" << *std::min_element(lengths.begin(), lengths.end())
-                         << " MaxLen=" << *std::max_element(lengths.begin(), lengths.end())
+                         << " MinLen="
+                         << *std::min_element(lengths.begin(), lengths.end())
+                         << " MaxLen="
+                         << *std::max_element(lengths.begin(), lengths.end())
                          << " Mem: " << sprintMemStat();
-
 
         // checkpoint evaluation
         if ((!logOnEpoch && curIter % FLAGS_reportiters == 0) ||
@@ -627,19 +669,21 @@ int main(int argc, char** argv) {
           // maybe update proposal network
           double newproperr = avgValidErr(meters);
           LOG(INFO) << "ProposalNetwork:"
-                    << " new=" << newproperr
-                    << " old=" << properr;
+                    << " new=" << newproperr << " old=" << properr;
           if ((FLAGS_propupdate == kAlways) ||
               (FLAGS_propupdate == kBetter && properr > newproperr)) {
             LOG(INFO) << "Update proposal model to the current model";
             logHelper.saveProposalModel(config, network, criterion);
             properr = newproperr;
 
-            // TODO: better method for loading the best model to the proposal model?
+            // TODO: better method for loading the best model to the proposal
+            // model?
             std::string workerPropPath = logHelper.saveWorkerProposalModel(
                 config, network, criterion, worldRank);
-            W2lSerializer::load(workerPropPath, propcfg, propnet, base_propcrit);
-            propcrit = std::dynamic_pointer_cast<Seq2SeqCriterion>(base_propcrit);
+            W2lSerializer::load(
+                workerPropPath, propcfg, propnet, base_propcrit);
+            propcrit =
+                std::dynamic_pointer_cast<Seq2SeqCriterion>(base_propcrit);
             propnet->eval();
             propcrit->eval();
           }
