@@ -6,8 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <iomanip>
 #include <flashlight/flashlight.h>
+#include <iomanip>
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
@@ -17,12 +17,12 @@
 #include "common/Utils.h"
 #include "criterion/criterion.h"
 #include "data/W2lListFilesDataset.h"
-#include "module/module.h"
-#include "runtime/Serial.h"
+#include "experimental/localPriorMatch/src/module/LMCritic.h"
 #include "experimental/localPriorMatch/src/runtime/Defines.h"
 #include "experimental/localPriorMatch/src/runtime/Init.h"
 #include "experimental/localPriorMatch/src/runtime/Utils.h"
-#include "experimental/localPriorMatch/src/module/LMCritic.h"
+#include "module/module.h"
+#include "runtime/Serial.h"
 
 using namespace w2l;
 
@@ -63,26 +63,25 @@ int main(int argc, char** argv) {
     LOG(FATAL) << "Error opening decode result file: " << outpath;
   }
 
-  auto writeResult = [&](
-      const std::string& type, 
-      const std::vector<int>& path, 
-      float score, 
-      int rank) {
-    outStream << type << " Rank=" << rank 
-              << " ASR_Score=" << score << " ";
-    for (int i=0; i<path.size(); i++) {
-      if (i != 0) { outStream << ","; }
+  auto writeResult = [&](const std::string& type,
+                         const std::vector<int>& path,
+                         float score,
+                         int rank) {
+    outStream << type << " Rank=" << rank << " ASR_Score=" << score << " ";
+    for (int i = 0; i < path.size(); i++) {
+      if (i != 0) {
+        outStream << ",";
+      }
       outStream << path[i];
     }
     outStream << std::endl;
   };
 
-
   W2lSerializer::load(reloadpath, cfg, base_network, base_criterion);
   auto network = std::dynamic_pointer_cast<fl::Sequential>(base_network);
   auto criterion = std::dynamic_pointer_cast<Seq2SeqCriterion>(base_criterion);
 
-	auto flags = cfg.find(kGflags);
+  auto flags = cfg.find(kGflags);
   if (flags == cfg.end()) {
     LOG(FATAL) << "Invalid config loaded from " << reloadpath;
   }
@@ -93,7 +92,7 @@ int main(int argc, char** argv) {
 
   LOG(INFO) << "Gflags after parsing \n" << serializeGflags("; ");
 
-	/* =============== Create Dictionary and Lexicon ================ */
+  /* =============== Create Dictionary and Lexicon ================ */
   Dictionary dict(pathsConcat(FLAGS_tokensdir, FLAGS_tokens));
   for (int64_t r = 1; r <= FLAGS_replabel; ++r) {
     dict.addEntry(std::to_string(r));
@@ -104,7 +103,7 @@ int main(int argc, char** argv) {
 
   LOG(INFO) << "Number of classes (network) = " << dict.indexSize();
 
-	DictionaryMap dicts;
+  DictionaryMap dicts;
   dicts.insert({kTargetIdx, dict});
 
   std::shared_ptr<W2lDataset> testset;
@@ -119,10 +118,9 @@ int main(int argc, char** argv) {
   LOG(INFO) << "[Network Params] " << numTotalParams(network);
   LOG(INFO) << "[Criterion] " << criterion->prettyString();
   LOG(INFO) << "[Criterion Params] " << numTotalParams(criterion);
-  
 
-	/* =========== Create Meters and Helper Functions =============== */
-  af::setMemStepSize(FLAGS_memstepsize);
+  /* =========== Create Meters and Helper Functions =============== */
+  fl::afSetMemStepSize(FLAGS_memstepsize);
   af::setSeed(FLAGS_seed);
   std::string metername = FLAGS_target == "ltr" ? "LER: " : "PER: ";
 
@@ -137,7 +135,7 @@ int main(int argc, char** argv) {
   network->eval();
   criterion->eval();
 
-	/* ============== Enumerate Through Dataset  ==================== */
+  /* ============== Enumerate Through Dataset  ==================== */
   int uid = 1;
   for (auto& sample : *testset) {
     auto output = network->forward(fl::input(sample[kInputIdx]));
@@ -155,7 +153,9 @@ int main(int argc, char** argv) {
       beam.emplace_back(Seq2SeqCriterion::CandidateHypo{});
       auto hypos = criterion->beamSearch(
           output.array()(af::span, af::span, b),
-          beam, FLAGS_beamsz, FLAGS_maxdecoderoutputlen);
+          beam,
+          FLAGS_beamsz,
+          FLAGS_maxdecoderoutputlen);
       auto beampath = hypos[0].path;
       beamSearchTimer.stopAndIncUnit();
 
@@ -163,10 +163,10 @@ int main(int argc, char** argv) {
       auto score = -1 * loss(b).scalar<float>();
       writeResult("Tgt", tgtraw, score, -1);
 
-      for (int r=0; r<hypos.size(); ++r) {
+      for (int r = 0; r < hypos.size(); ++r) {
         remapLabels(hypos[r].path, dict);
-        writeResult("Hyp", hypos[r].path, hypos[r].score, r+1);
-			}
+        writeResult("Hyp", hypos[r].path, hypos[r].score, r + 1);
+      }
 
       remapLabels(beampath, dict);
       remapLabels(tgtraw, dict);
@@ -176,9 +176,10 @@ int main(int argc, char** argv) {
 
       cerBeamMeter.add(beampathLtr, tgtrawLtr);
       if (FLAGS_target == "ltr") {
-        auto beamwords =
-            split(FLAGS_wordseparator, stringify<std::string>(beampathLtr, ""), true);
-        auto tgtwords = split(FLAGS_wordseparator, stringify<std::string>(tgtrawLtr, ""), true);
+        auto beamwords = split(
+            FLAGS_wordseparator, stringify<std::string>(beampathLtr, ""), true);
+        auto tgtwords = split(
+            FLAGS_wordseparator, stringify<std::string>(tgtrawLtr, ""), true);
         werBeamMeter.add(beamwords, tgtwords);
       }
       lossMeter.add(lossvec[b]);

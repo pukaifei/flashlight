@@ -52,13 +52,17 @@ int main(int argc, char** argv) {
   std::string runStatus = config[kRunStatus];
 
   /* ================ Set up distributed environment ================ */
-  af::setMemStepSize(FLAGS_memstepsize);
+  fl::afSetMemStepSize(FLAGS_memstepsize);
   af::setSeed(FLAGS_seed);
   af::setFFTPlanCacheSize(FLAGS_fftcachesize);
 
   std::shared_ptr<fl::Reducer> reducer = nullptr;
   if (FLAGS_enable_distributed) {
-    initDistributed(FLAGS_world_rank, FLAGS_world_size, FLAGS_rndv_filepath);
+    initDistributed(
+        FLAGS_world_rank,
+        FLAGS_world_size,
+        FLAGS_max_devices_per_node,
+        FLAGS_rndv_filepath);
     reducer = std::make_shared<fl::CoalescingReducer>(
         1.0 / fl::getWorldSize(), true, true);
   }
