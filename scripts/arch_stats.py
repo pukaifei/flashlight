@@ -91,7 +91,12 @@ if __name__ == "__main__":
                 c = int(linesplit[1])
                 kw = int(linesplit[2])
                 h = int(linesplit[3])
-                params += c * c * (kw + 2 * h * h)
+                inner_lin_dim = (
+                    int(linesplit[5])
+                    if (len(linesplit) > 5 and int(linesplit[5]) != 0)
+                    else c * h
+                )
+                params += c * (c * kw + 2 * inner_lin_dim * h)
 
             overall_kw += (kw - 1) * overall_dw * dil
             overall_dw *= dw
