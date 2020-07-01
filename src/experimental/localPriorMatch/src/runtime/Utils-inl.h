@@ -21,7 +21,7 @@ std::string stringify(const std::vector<T>& vec, std::string sep) {
   return os.str();
 }
 
-template<class T, class S>
+template <class T, class S>
 std::vector<S> getLengths(const std::vector<std::vector<T>>& vec) {
   std::vector<S> lengths;
   if (vec.empty()) {

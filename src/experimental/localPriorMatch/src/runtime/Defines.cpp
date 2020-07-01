@@ -30,10 +30,7 @@ DEFINE_string(
     schedulerorder,
     kUniformOrder,
     "the access order between the datasets in the data scheduler (uniform, inorder, random)");
-DEFINE_int64(
-    unpairedBatchsize,
-    4,
-    "Batch size for unpaired data");
+DEFINE_int64(unpairedBatchsize, 4, "Batch size for unpaired data");
 
 // lmcrit
 DEFINE_string(lmdict, "", "Dictionary used in LM training");
@@ -58,14 +55,8 @@ DEFINE_string(
     "Sampling strategy to use on unpaired audio (model, gumbel)");
 
 // within-beam prior-match
-DEFINE_int64(
-    pmBeamsz,
-    10,
-    "Beam size for prior matching objective");
-DEFINE_string(
-    pmType,
-    kRegKL,
-    "Type of prior-match objective (regKl, revKl)");
+DEFINE_int64(pmBeamsz, 10, "Beam size for prior matching objective");
+DEFINE_string(pmType, kRegKL, "Type of prior-match objective (regKl, revKl)");
 DEFINE_bool(
     pmLabelSmooth,
     true,
@@ -82,36 +73,24 @@ DEFINE_string(
     normlmcritprob,
     kNoNorm,
     "Method for normalizing LMCrit probabilty");
-DEFINE_string(
-    norms2sprob,
-    kNoNorm,
-    "Method for normalizing S2S probabilty");
+DEFINE_string(norms2sprob, kNoNorm, "Method for normalizing S2S probabilty");
 DEFINE_double(
     lmcritsmooth,
     1.0,
     "If length normalization is used, divide logits by Len^{1/r}, where r is this value");
-DEFINE_bool(
-    useuniformlm,
-    false,
-    "Assume uniform distribution among hypothese");
+DEFINE_bool(useuniformlm, false, "Assume uniform distribution among hypothese");
 DEFINE_double(
     advmargin,
     0.0,
     "Advantage margin between out-of-beam hypotheses and the lowest on in the beam");
-DEFINE_string(
-    proppath,
-    "",
-    "Path to load the proposal model for beam search.");
+DEFINE_string(proppath, "", "Path to load the proposal model for beam search.");
 DEFINE_string(
     propupdate,
     kBetter,
     "Update rule for proposal model (never,always,better)");
 
 // miscellaneous, used for debugging
-DEFINE_bool(
-    debug,
-    false,
-    "Turn on all debugging messages");
+DEFINE_bool(debug, false, "Turn on all debugging messages");
 
 // for ablation studies
 DEFINE_bool(
@@ -119,5 +98,5 @@ DEFINE_bool(
     false,
     "Turn on to shuffle LMCrit probs assigned to hypotheses in a beam");
 
-} 
+} // namespace w2l
 // namespace w2l

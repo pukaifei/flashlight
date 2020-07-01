@@ -5,11 +5,11 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-#include <fstream>
-#include <stdexcept>
-#include <iostream>
 #include <arrayfire.h>
 #include <glog/logging.h>
+#include <fstream>
+#include <iostream>
+#include <stdexcept>
 
 #include "experimental/localPriorMatch/src/runtime/Utils.h"
 
@@ -75,11 +75,8 @@ std::pair<std::vector<int>, int> genTokenDictIndexMap(
 }
 
 void print_path(std::vector<int> path, Dictionary& dict) {
-  std::cout << "Idx = "
-            << stringify<int>(path)
-            << std::endl;
-  std::cout << "Str = "
-            << stringify<std::string>(wrdIdx2Wrd(path, dict))
+  std::cout << "Idx = " << stringify<int>(path) << std::endl;
+  std::cout << "Str = " << stringify<std::string>(wrdIdx2Wrd(path, dict))
             << std::endl;
 }
 
@@ -93,9 +90,8 @@ std::vector<int> remapLabelsForLM(std::vector<int> path, Dictionary& dict) {
 std::string arrDimStr(const af::array& arr) {
   std::ostringstream os;
   auto dims = arr.dims();
-  os << "("
-     << dims[0] << ", " << dims[1] << ", "
-     << dims[2] << ", " << dims[3] << ")";
+  os << "(" << dims[0] << ", " << dims[1] << ", " << dims[2] << ", " << dims[3]
+     << ")";
   return os.str();
 }
 
@@ -118,7 +114,9 @@ std::pair<std::vector<std::vector<int>>, std::vector<int>> batchBeamSearch(
     // search call from Seq2SeqCriterion
     auto hypos = criterion->beamSearch(
         output.array()(af::span, af::span, b),
-        initBeam, FLAGS_pmBeamsz, FLAGS_maxdecoderoutputlen);
+        initBeam,
+        FLAGS_pmBeamsz,
+        FLAGS_maxdecoderoutputlen);
 
     for (auto& hypo : hypos) {
       hypo.path.push_back(eos);
@@ -131,9 +129,13 @@ std::pair<std::vector<std::vector<int>>, std::vector<int>> batchBeamSearch(
   if (FLAGS_debug) {
     std::ostringstream os;
     os << "lengths : ";
-    for (auto& path : paths) { os << path.size() << " "; }
+    for (auto& path : paths) {
+      os << path.size() << " ";
+    }
     os << "\nscores : ";
-    for (auto& score : scores) { os << score << " "; }
+    for (auto& score : scores) {
+      os << score << " ";
+    }
     LOG(INFO) << std::endl << os.str();
   }
 
@@ -158,16 +160,15 @@ std::pair<std::vector<std::vector<int>>, std::vector<int>> filterBeamByLength(
   int offset = 0;
   std::vector<std::vector<int>> newPaths;
   std::vector<int> newHypoNums;
-  for (int b=0; b<hypoNums.size(); b++) {
+  for (int b = 0; b < hypoNums.size(); b++) {
     int newHypoNum = 0;
     int lb = std::floor(rlb * refLengths[b]);
     int ub = std::ceil(rub * refLengths[b]);
-    for (int i=0; i<hypoNums[b]; i++) {
+    for (int i = 0; i < hypoNums[b]; i++) {
       int cur_idx = offset + i;
       // also remove length=1 (empty hypotheses)
-      if (paths[cur_idx].size() >= lb
-          && paths[cur_idx].size() <= ub
-          && paths[cur_idx].size() > 1) {
+      if (paths[cur_idx].size() >= lb && paths[cur_idx].size() <= ub &&
+          paths[cur_idx].size() > 1) {
         newPaths.push_back(paths[cur_idx]);
         newHypoNum += 1;
       }
@@ -183,18 +184,18 @@ fl::Variable computeLmLogprob(
     const std::vector<std::vector<int>>& paths,
     const std::shared_ptr<LMCritic>& lmcrit,
     const Dictionary& dict) {
-
   auto tgt = batchTarget(paths, dict.getIndex(kEosToken));
   auto tgtOnehot = fl::noGrad(makeOnehot(tgt, dict.indexSize()));
-  auto tgtLen = af::array(
-      af::dim4(1, paths.size()), getLengths<int, int>(paths).data());
+  auto tgtLen =
+      af::array(af::dim4(1, paths.size()), getLengths<int, int>(paths).data());
   auto lmLogprob = fl::negate(
       lmcrit->forward({fl::log(tgtOnehot), fl::noGrad(tgtLen)}).front());
   return lmLogprob;
 }
 
 fl::Variable postprocLmLogprob(
-    fl::Variable logprob, const std::vector<std::vector<int>>& paths) {
+    fl::Variable logprob,
+    const std::vector<std::vector<int>>& paths) {
   fl::Variable procLogprob;
   if (FLAGS_normlmcritprob == kNoNorm) {
     procLogprob = logprob;
@@ -233,21 +234,20 @@ fl::Variable computeS2SLogprob(
       auto curTiledOutput = fl::tile(curOutpt, af::dim4(1, 1, hypoNums[i]));
       if (FLAGS_debug) {
         std::cout << " hypoNum[" << i << "] : " << hypoNums[i]
-                  << " tiledEncoderOutputVec[" << i << "] : "
-                  << arrDimStr(curTiledOutput.array()) << std::endl;
+                  << " tiledEncoderOutputVec[" << i
+                  << "] : " << arrDimStr(curTiledOutput.array()) << std::endl;
       }
       tiledEncoderOutputVec.emplace_back(curTiledOutput);
     }
   }
   auto tiledEncoderOutput = concatenate(tiledEncoderOutputVec, 2);
   if (FLAGS_debug) {
-      std::cout << " tiledEncoderOutput : "
-                << arrDimStr(tiledEncoderOutput.array()) << std::endl;
-
+    std::cout << " tiledEncoderOutput : "
+              << arrDimStr(tiledEncoderOutput.array()) << std::endl;
   }
   if (paths.size() != static_cast<size_t>(tiledEncoderOutput.dims()[2])) {
-      LOG(FATAL) << "Shape mismatch : " << paths.size()
-                 << " vs " << tiledEncoderOutput.dims()[2];
+    LOG(FATAL) << "Shape mismatch : " << paths.size() << " vs "
+               << tiledEncoderOutput.dims()[2];
   }
 
   // [sum(hypoNums), 1]
@@ -264,7 +264,8 @@ fl::Variable computeS2SLogprob(
 }
 
 fl::Variable postprocS2SLogprob(
-    fl::Variable logprob, const std::vector<std::vector<int>>& paths,
+    fl::Variable logprob,
+    const std::vector<std::vector<int>>& paths,
     const std::vector<int>& hypoNums) {
   fl::Variable procLogprob;
   if (FLAGS_norms2sprob == kNoNorm) {
@@ -276,7 +277,8 @@ fl::Variable postprocS2SLogprob(
     }
     procLogprob = logprob / maxlen;
   } else if (FLAGS_norms2sprob == kUnitNorm) {
-    logprob = logprob - fl::noGrad(variableMax(logprob, hypoNums, true).array());
+    logprob =
+        logprob - fl::noGrad(variableMax(logprob, hypoNums, true).array());
     auto logsumexp = fl::log(variableSum(fl::exp(logprob), hypoNums, true));
     procLogprob = logprob - fl::noGrad(logsumexp.array());
   } else if (FLAGS_norms2sprob != kNoNorm) {
@@ -287,12 +289,13 @@ fl::Variable postprocS2SLogprob(
 
 // random re-assign LM probability for ablation study
 fl::Variable shuffleProb(
-    const fl::Variable& logprob, const std::vector<int>& hypoNums) {
+    const fl::Variable& logprob,
+    const std::vector<int>& hypoNums) {
   std::vector<fl::Variable> outputVec;
   int offset = 0;
   for (auto& hypoNum : hypoNums) {
     if (hypoNum > 0) {
-      auto logprobSlice = logprob(af::seq(offset, offset+hypoNum-1));
+      auto logprobSlice = logprob(af::seq(offset, offset + hypoNum - 1));
       std::vector<int> idx(hypoNum);
       std::iota(idx.begin(), idx.end(), 0);
       std::random_shuffle(idx.begin(), idx.end());
@@ -305,17 +308,18 @@ fl::Variable shuffleProb(
     }
   }
   if (offset != logprob.dims()[0]) {
-    LOG(FATAL) << "Total number of hypos inconsistent : "
-               << offset << " vs " << logprob.dims()[0];
+    LOG(FATAL) << "Total number of hypos inconsistent : " << offset << " vs "
+               << logprob.dims()[0];
   }
   return concatenate(outputVec, 0);
-
 }
 
 // maybe renormalize and/or change to linear scale
 fl::Variable adjustProb(
-    const fl::Variable& logprob, const std::vector<int>& hypoNums,
-    bool renormalize, bool linear) {
+    const fl::Variable& logprob,
+    const std::vector<int>& hypoNums,
+    bool renormalize,
+    bool linear) {
   if (!renormalize && !linear) {
     return logprob;
   }
@@ -324,7 +328,7 @@ fl::Variable adjustProb(
   int offset = 0;
   for (auto& hypoNum : hypoNums) {
     if (hypoNum > 0) {
-      auto logprobSlice = logprob(af::seq(offset, offset+hypoNum-1));
+      auto logprobSlice = logprob(af::seq(offset, offset + hypoNum - 1));
       if (renormalize && linear) {
         outputVec.emplace_back(fl::softmax(logprobSlice, 0));
       } else if (renormalize && !linear) {
@@ -338,14 +342,15 @@ fl::Variable adjustProb(
     }
   }
   if (offset != logprob.dims()[0]) {
-    LOG(FATAL) << "Total number of hypos inconsistent : "
-               << offset << " vs " << logprob.dims()[0];
+    LOG(FATAL) << "Total number of hypos inconsistent : " << offset << " vs "
+               << logprob.dims()[0];
   }
   return concatenate(outputVec, 0);
 }
 
 fl::Variable computeAdvantage(
-    const fl::Variable& logprob, const std::vector<int>& hypoNums,
+    const fl::Variable& logprob,
+    const std::vector<int>& hypoNums,
     const double& margin) {
   // a(y) = logp(y) - min_{y' \in beam} logp(y') + margin
   std::vector<fl::Variable> out;
@@ -356,21 +361,22 @@ fl::Variable computeAdvantage(
     if (hypoNum == 0) {
       continue;
     }
-    logprobSlice = logprob(af::seq(offset, offset+hypoNum-1));
+    logprobSlice = logprob(af::seq(offset, offset + hypoNum - 1));
     baseline = af::min(logprobSlice.array()) - margin;
     baseline = af::tile(baseline, af::dim4(hypoNum));
     out.emplace_back(logprobSlice - fl::noGrad(baseline));
     offset += hypoNum;
   }
   if (offset != logprob.dims()[0]) {
-    LOG(FATAL) << "Total number of hypos inconsistent : "
-               << offset << " vs " << logprob.dims()[0];
+    LOG(FATAL) << "Total number of hypos inconsistent : " << offset << " vs "
+               << logprob.dims()[0];
   }
   return concatenate(out, 0);
 }
 
 fl::Variable entropy(
-    const fl::Variable& logprob, const std::vector<int>& hypoNums) {
+    const fl::Variable& logprob,
+    const std::vector<int>& hypoNums) {
   fl::Variable p = adjustProb(logprob, hypoNums, true, true);
   fl::Variable logp = fl::log(p + 1e-6);
   fl::Variable ent = fl::sum(fl::negate(p * logp), {0});
@@ -378,14 +384,14 @@ fl::Variable entropy(
   return ent;
 }
 
-fl::Variable variableSum(
-    const fl::Variable& var, const std::vector<int>& sizes, bool tile) {
+fl::Variable
+variableSum(const fl::Variable& var, const std::vector<int>& sizes, bool tile) {
   std::vector<fl::Variable> out;
   int offset = 0;
   for (auto& size : sizes) {
     fl::Variable val(af::constant(0, af::dim4(1)), false);
     if (size > 0) {
-      val = fl::sum(var(af::seq(offset, offset+size-1)), {0});
+      val = fl::sum(var(af::seq(offset, offset + size - 1)), {0});
     }
 
     if (!tile) {
@@ -396,20 +402,20 @@ fl::Variable variableSum(
     offset += size;
   }
   if (offset != var.dims()[0]) {
-    LOG(FATAL) << "Total number of sizes inconsistent : "
-               << offset << " vs " << var.dims()[0];
+    LOG(FATAL) << "Total number of sizes inconsistent : " << offset << " vs "
+               << var.dims()[0];
   }
   return concatenate(out, 0);
 }
 
-fl::Variable variableMax(
-    const fl::Variable& var, const std::vector<int>& sizes, bool tile) {
+fl::Variable
+variableMax(const fl::Variable& var, const std::vector<int>& sizes, bool tile) {
   std::vector<fl::Variable> out;
   int offset = 0;
   for (auto& size : sizes) {
     fl::Variable val(af::constant(0, af::dim4(1)), false);
     if (size > 0) {
-      auto varSlice = var(af::seq(offset, offset+size-1));
+      auto varSlice = var(af::seq(offset, offset + size - 1));
       af::array valArr, idxArr;
       af::max(valArr, idxArr, varSlice.array(), 0);
       val = varSlice(idxArr);
@@ -423,8 +429,8 @@ fl::Variable variableMax(
     offset += size;
   }
   if (offset != var.dims()[0]) {
-    LOG(FATAL) << "Total number of sizes inconsistent : "
-               << offset << " vs " << var.dims()[0];
+    LOG(FATAL) << "Total number of sizes inconsistent : " << offset << " vs "
+               << var.dims()[0];
   }
   return concatenate(out, 0);
 }
@@ -433,7 +439,6 @@ fl::Variable computePriorMatchingLoss(
     const fl::Variable& lmLogprob,
     const fl::Variable& s2sLogprob,
     const std::vector<int>& hypoNums) {
-
   fl::Variable loss;
   if (FLAGS_pmType == kRegKL) {
     auto lmRenormProb = adjustProb(lmLogprob, hypoNums, true, true);
@@ -450,7 +455,8 @@ fl::Variable computePriorMatchingLoss(
 }
 
 af::array batchTarget(
-    const std::vector<std::vector<int>>& tgt, const int& padVal) {
+    const std::vector<std::vector<int>>& tgt,
+    const int& padVal) {
   std::vector<int> vecTgt;
   af::dim4 vecTgtDims;
   int batchSz = tgt.size();
@@ -467,10 +473,7 @@ af::array batchTarget(
   vecTgtDims = af::dim4(maxTgtSize, batchSz);
 
   for (size_t i = 0; i < batchSz; ++i) {
-    std::copy(
-        tgt[i].begin(),
-        tgt[i].end(),
-        vecTgt.begin() + maxTgtSize * i);
+    std::copy(tgt[i].begin(), tgt[i].end(), vecTgt.begin() + maxTgtSize * i);
   }
   return af::array(vecTgtDims, vecTgt.data());
 }
@@ -481,7 +484,7 @@ af::array makeOnehot(af::array& idx, const int& nClass) {
   auto flatIdx = af::flat(idx);
 
   af::array A = af::range(af::dim4(nClass, tgtLen * batchSz));
-  af::array B = af::reorder(flatIdx, 1, 0);  // [1, tgtLen * batchSz]
+  af::array B = af::reorder(flatIdx, 1, 0); // [1, tgtLen * batchSz]
   B = af::tile(B, af::dim4(nClass, 1));
   auto onehot = (A == B).as(af::dtype::f32); // [nClass, tgtLen * batchSz]
   return af::moddims(onehot, af::dim4(nClass, tgtLen, batchSz));

@@ -13,9 +13,9 @@
 
 #include <flashlight/flashlight.h>
 
-#include "libraries/common/Dictionary.h"
 #include "criterion/criterion.h"
 #include "experimental/localPriorMatch/src/module/LMCritic.h"
+#include "libraries/common/Dictionary.h"
 
 namespace w2l {
 Dictionary createFairseqTokenDict(const std::string& filepath);
@@ -40,9 +40,9 @@ std::vector<int> remapLabelsForLM(std::vector<int> path, Dictionary& dict);
 std::string arrDimStr(const af::array& arr);
 
 template <class T>
-std::string stringify(const std::vector<T>& vec, std::string sep=" ");
+std::string stringify(const std::vector<T>& vec, std::string sep = " ");
 
-template<class T, class S>
+template <class T, class S>
 std::vector<S> getLengths(const std::vector<std::vector<T>>& vec);
 
 af::array getTargetLength(af::array& target, int eosIdx);
@@ -63,7 +63,8 @@ fl::Variable computeLmLogprob(
     const Dictionary& dict);
 
 fl::Variable postprocLmLogprob(
-    fl::Variable logprob, const std::vector<std::vector<int>>& paths);
+    fl::Variable logprob,
+    const std::vector<std::vector<int>>& paths);
 
 fl::Variable postprocS2SLogprob(
     fl::Variable logprob,
@@ -78,24 +79,33 @@ fl::Variable computeS2SLogprob(
     const Dictionary& dict);
 
 fl::Variable shuffleProb(
-    const fl::Variable& logprob, const std::vector<int>& hypoNums);
+    const fl::Variable& logprob,
+    const std::vector<int>& hypoNums);
 
 fl::Variable adjustProb(
-    const fl::Variable& logprob, const std::vector<int>& hypoNums,
-    bool renormalize, bool linear);
+    const fl::Variable& logprob,
+    const std::vector<int>& hypoNums,
+    bool renormalize,
+    bool linear);
 
 fl::Variable computeAdvantage(
-    const fl::Variable& logprob, const std::vector<int>& hypoNums,
+    const fl::Variable& logprob,
+    const std::vector<int>& hypoNums,
     const double& margin);
 
 fl::Variable entropy(
-    const fl::Variable& logprob, const std::vector<int>& hypoNums);
+    const fl::Variable& logprob,
+    const std::vector<int>& hypoNums);
 
 fl::Variable variableSum(
-    const fl::Variable& var, const std::vector<int>& sizes, bool tile=false);
+    const fl::Variable& var,
+    const std::vector<int>& sizes,
+    bool tile = false);
 
 fl::Variable variableMax(
-    const fl::Variable& var, const std::vector<int>& sizes, bool tile=false);
+    const fl::Variable& var,
+    const std::vector<int>& sizes,
+    bool tile = false);
 
 fl::Variable computePriorMatchingLoss(
     const fl::Variable& lmLogprob,
@@ -103,7 +113,8 @@ fl::Variable computePriorMatchingLoss(
     const std::vector<int>& hypoNums);
 
 af::array batchTarget(
-    const std::vector<std::vector<int>>& tgt, const int& padVal);
+    const std::vector<std::vector<int>>& tgt,
+    const int& padVal);
 
 af::array makeOnehot(af::array& idx, const int& nClass);
 
