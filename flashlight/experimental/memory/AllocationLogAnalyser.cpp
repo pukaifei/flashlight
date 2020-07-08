@@ -160,8 +160,9 @@ int main(int argc, char** argv) {
   }
 
   const double cacheInternalFragmentation =
-      ((1.0 - (static_cast<double>(allCacheRequestedSum) /
-               static_cast<double>(allCacheAllocatedSum))) *
+      ((1.0 -
+        (static_cast<double>(allCacheRequestedSum) /
+         static_cast<double>(allCacheAllocatedSum))) *
        100.0);
 
   HistogramStats<size_t> allocationRequestsHist =
@@ -193,8 +194,9 @@ int main(int argc, char** argv) {
   std::stringstream ss;
   ss << std::endl
      << "nativeInternalFragmentation="
-     << ((1.0 - (static_cast<double>(allNativeRequestedSum) /
-                 static_cast<double>(allNativeAllocatedSum))) *
+     << ((1.0 -
+          (static_cast<double>(allNativeRequestedSum) /
+           static_cast<double>(allNativeAllocatedSum))) *
          100)
      << '%' << " allNativeRequestedSum="
      << prettyStringMemorySize(allNativeRequestedSum)
@@ -279,12 +281,14 @@ int main(int argc, char** argv) {
     ss << std::setw(2) << i << ", " << std::setw(30)
        << prettyStringMemorySize(allocationRequestSize.at(idx)) << ", "
        << std::setw(30) << prettyStringCount(allocationRequestSizeCount.at(idx))
-       << ", " << ((static_cast<double>(allocationRequestSizeCount.at(idx)) /
-                    numAllocationRequests) *
-                   100.0)
-       << ", " << prettyStringMemorySize(
-                      allocationRequestSize.at(idx) *
-                      allocationRequestSizeCount.at(idx))
+       << ", "
+       << ((static_cast<double>(allocationRequestSizeCount.at(idx)) /
+            numAllocationRequests) *
+           100.0)
+       << ", "
+       << prettyStringMemorySize(
+              allocationRequestSize.at(idx) *
+              allocationRequestSizeCount.at(idx))
        << std::endl;
   }
   LOG(INFO) << ss.str();
