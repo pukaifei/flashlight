@@ -14,7 +14,8 @@
 
 #include "libraries/language/decoder/LexiconFreeSeq2SeqDecoder.h"
 
-namespace w2l {
+namespace fl {
+namespace lib {
 
 void LexiconFreeSeq2SeqDecoder::decodeStep(
     const float* emissions,
@@ -175,4 +176,5 @@ int LexiconFreeSeq2SeqDecoder::nDecodedFramesInBuffer() const {
   return -1;
 }
 
-} // namespace w2l
+} 
+}

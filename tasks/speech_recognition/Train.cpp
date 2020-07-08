@@ -20,17 +20,20 @@
 #include <glog/logging.h>
 
 #include "common/Defines.h"
-#include "decoder/Utils.h"
 #include "criterion/criterion.h"
+#include "decoder/Utils.h"
 #include "runtime/runtime.h"
 
+#include "extensions/common/SequentialBuilder.h"
+#include "extensions/common/Utils.h"
 #include "libraries/common/System.h"
 #include "libraries/language/dictionary/Dictionary.h"
 #include "libraries/language/dictionary/Utils.h"
-#include "extensions/common/Utils.h"
-#include "extensions/common/SequentialBuilder.h"
 
-using namespace w2l;
+using namespace fl;
+using namespace fl::ext;
+using namespace fl::lib;
+using namespace fl::task::asr;
 
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
@@ -72,7 +75,7 @@ int main(int argc, char** argv) {
     reloadPath = getRunFile("model_last.bin", runIdx - 1, runPath);
     LOG(INFO) << "reload path is " << reloadPath;
     std::unordered_map<std::string, std::string> cfg;
-    W2lSerializer::load(reloadPath, cfg);
+    Serializer::load(reloadPath, cfg);
     auto flags = cfg.find(kGflags);
     if (flags == cfg.end()) {
       LOG(FATAL) << "Invalid config loaded from " << reloadPath;
@@ -104,7 +107,7 @@ int main(int argc, char** argv) {
   } else if (runStatus == kForkMode) {
     reloadPath = argv[2];
     std::unordered_map<std::string, std::string> cfg;
-    W2lSerializer::load(reloadPath, cfg);
+    Serializer::load(reloadPath, cfg);
     auto flags = cfg.find(kGflags);
     if (flags == cfg.end()) {
       LOG(FATAL) << "Invalid config loaded from " << reloadPath;
@@ -131,7 +134,7 @@ int main(int argc, char** argv) {
   // Only new flags are re-serialized. Copy any values from deprecated flags to
   // new flags when deprecated flags are present and corresponding new flags
   // aren't
-  w2l::handleDeprecatedFlags();
+  handleDeprecatedFlags();
 
   af::setSeed(FLAGS_seed);
   af::setFFTPlanCacheSize(FLAGS_fftcachesize);
@@ -246,10 +249,10 @@ int main(int argc, char** argv) {
     }
   } else if (runStatus == kForkMode) {
     std::unordered_map<std::string, std::string> cfg; // unused
-    W2lSerializer::load(reloadPath, cfg, network, criterion);
+    Serializer::load(reloadPath, cfg, network, criterion);
   } else { // kContinueMode
     std::unordered_map<std::string, std::string> cfg; // unused
-    W2lSerializer::load(
+    Serializer::load(
         reloadPath, cfg, network, criterion, netoptim, critoptim);
   }
   LOG_MASTER(INFO) << "[Network] " << network->prettyString();
@@ -332,11 +335,11 @@ int main(int argc, char** argv) {
   }
 
   auto logStatus = [&perfFile, &logFile, isMaster](
-                       TrainMeters& mtrs,
-                       int64_t epoch,
-                       int64_t nupdates,
-                       double lr,
-                       double lrcrit) {
+      TrainMeters& mtrs,
+      int64_t epoch,
+      int64_t nupdates,
+      double lr,
+      double lrcrit) {
     syncMeter(mtrs);
 
     if (isMaster) {
@@ -361,13 +364,13 @@ int main(int argc, char** argv) {
       if (FLAGS_itersave) {
         filename =
             getRunFile(format("model_iter_%03d.bin", iter), runIdx, runPath);
-        W2lSerializer::save(
+        Serializer::save(
             filename, config, network, criterion, netoptim, critoptim);
       }
 
       // save last model
       filename = getRunFile("model_last.bin", runIdx, runPath);
-      W2lSerializer::save(
+      Serializer::save(
           filename, config, network, criterion, netoptim, critoptim);
 
       // save if better than ever for one valid
@@ -378,7 +381,7 @@ int main(int argc, char** argv) {
           std::string cleaned_v = cleanFilepath(v.first);
           std::string vfname =
               getRunFile("model_" + cleaned_v + ".bin", runIdx, runPath);
-          W2lSerializer::save(
+          Serializer::save(
               vfname, config, network, criterion, netoptim, critoptim);
         }
       }
@@ -408,15 +411,13 @@ int main(int argc, char** argv) {
 
   /* ===================== Hooks ===================== */
   auto evalOutput = [&dicts, &criterion](
-                        const af::array& op,
-                        const af::array& target,
-                        DatasetMeters& mtr) {
+      const af::array& op, const af::array& target, DatasetMeters& mtr) {
     auto batchsz = op.dims(2);
     for (int b = 0; b < batchsz; ++b) {
       auto tgt = target(af::span, b);
-      auto viterbipath =
-          w2l::afToVector<int>(criterion->viterbiPath(op(af::span, af::span, b)));
-      auto tgtraw = w2l::afToVector<int>(tgt);
+      auto viterbipath = afToVector<int>(
+          criterion->viterbiPath(op(af::span, af::span, b)));
+      auto tgtraw = afToVector<int>(tgt);
 
       // Remove `-1`s appended to the target for batching (if any)
       auto labellen = getTargetSize(tgtraw.data(), tgtraw.size());
@@ -440,10 +441,10 @@ int main(int argc, char** argv) {
   };
 
   auto test = [&evalOutput](
-                  std::shared_ptr<fl::Module> ntwrk,
-                  std::shared_ptr<SequenceCriterion> crit,
-                  std::shared_ptr<W2lDataset> testds,
-                  DatasetMeters& mtrs) {
+      std::shared_ptr<fl::Module> ntwrk,
+      std::shared_ptr<SequenceCriterion> crit,
+      std::shared_ptr<W2lDataset> testds,
+      DatasetMeters& mtrs) {
     ntwrk->eval();
     crit->eval();
     mtrs.tknEdit.reset();
@@ -465,234 +466,238 @@ int main(int argc, char** argv) {
 
   int64_t curEpoch = startEpoch;
 
-  auto train = [&meters,
-                &test,
-                &logStatus,
-                &saveModels,
-                &evalOutput,
-                &validds,
-                &trainEvalIds,
-                &curEpoch,
-                &startUpdate,
-                reducer](
-                   std::shared_ptr<fl::Module> ntwrk,
-                   std::shared_ptr<SequenceCriterion> crit,
-                   std::shared_ptr<W2lDataset> trainset,
-                   std::shared_ptr<fl::FirstOrderOptimizer> netopt,
-                   std::shared_ptr<fl::FirstOrderOptimizer> critopt,
-                   double initlr,
-                   double initcritlr,
-                   bool clampCrit,
-                   int64_t nbatches) {
-    if (reducer) {
-      fl::distributeModuleGrads(ntwrk, reducer);
-      fl::distributeModuleGrads(crit, reducer);
-    }
-
-    meters.train.loss.reset();
-    meters.train.tknEdit.reset();
-    meters.train.wrdEdit.reset();
-
-    std::shared_ptr<fl::SpecAugment> saug;
-    if (FLAGS_saug_start_update >= 0) {
-      saug = std::make_shared<fl::SpecAugment>(
-          FLAGS_filterbanks,
-          FLAGS_saug_fmaskf,
-          FLAGS_saug_fmaskn,
-          FLAGS_saug_tmaskt,
-          FLAGS_saug_tmaskp,
-          FLAGS_saug_tmaskn);
-    }
-
-    fl::allReduceParameters(ntwrk);
-    fl::allReduceParameters(crit);
-
-    auto resetTimeStatMeters = [&meters]() {
-      meters.runtime.reset();
-      meters.stats.reset();
-      meters.sampletimer.reset();
-      meters.fwdtimer.reset();
-      meters.critfwdtimer.reset();
-      meters.bwdtimer.reset();
-      meters.optimtimer.reset();
-      meters.timer.reset();
-    };
-    auto runValAndSaveModel = [&](int64_t totalEpochs,
-                                  int64_t totalUpdates,
-                                  double lr,
-                                  double lrcrit) {
-      meters.runtime.stop();
-      meters.timer.stop();
-      meters.sampletimer.stop();
-      meters.fwdtimer.stop();
-      meters.critfwdtimer.stop();
-      meters.bwdtimer.stop();
-      meters.optimtimer.stop();
-
-      // valid
-      for (auto& vds : validds) {
-        test(ntwrk, crit, vds.second, meters.valid[vds.first]);
-      }
-
-      // print status
-      try {
-        logStatus(meters, totalEpochs, totalUpdates, lr, lrcrit);
-      } catch (const std::exception& ex) {
-        LOG(ERROR) << "Error while writing logs: " << ex.what();
-      }
-      // save last and best models
-      try {
-        saveModels(totalEpochs, totalUpdates);
-      } catch (const std::exception& ex) {
-        LOG(FATAL) << "Error while saving models: " << ex.what();
-      }
-      // reset meters for next readings
-      meters.train.loss.reset();
-      meters.train.tknEdit.reset();
-      meters.train.wrdEdit.reset();
-    };
-
-    int64_t curBatch = startUpdate;
-    while (curBatch < nbatches) {
-      ++curEpoch; // counts partial epochs too!
-      int epochsAfterDecay = curEpoch - FLAGS_lr_decay;
-      double lrDecayScale =
-          std::pow(0.5, std::max(epochsAfterDecay, 0) / FLAGS_lr_decay_step);
-      ntwrk->train();
-      crit->train();
-      if (FLAGS_reportiters == 0) {
-        resetTimeStatMeters();
-      }
-      if (!FLAGS_noresample) {
-        LOG_MASTER(INFO) << "Shuffling trainset";
-        trainset->shuffle(curEpoch /* seed */);
-      }
-      af::sync();
-      meters.sampletimer.resume();
-      meters.runtime.resume();
-      meters.timer.resume();
-      LOG_MASTER(INFO) << "Epoch " << curEpoch << " started!";
-      for (auto& batch : *trainset) {
-        ++curBatch;
-        double lrScheduleScale;
-        if (FLAGS_lrcosine) {
-          const double pi = std::acos(-1);
-          lrScheduleScale =
-              std::cos(((double)curBatch) / ((double)nbatches) * pi / 2.0);
-        } else {
-          lrScheduleScale =
-              std::pow(FLAGS_gamma, (double)curBatch / (double)FLAGS_stepsize);
-        }
-        netopt->setLr(
-            initlr * lrDecayScale * lrScheduleScale *
-            std::min(curBatch / double(FLAGS_warmup), 1.0));
-        critopt->setLr(
-            initcritlr * lrDecayScale * lrScheduleScale *
-            std::min(curBatch / double(FLAGS_warmup), 1.0));
-        af::sync();
-        meters.timer.incUnit();
-        meters.sampletimer.stopAndIncUnit();
-        meters.stats.add(batch[kInputIdx], batch[kTargetIdx]);
-        if (af::anyTrue<bool>(af::isNaN(batch[kInputIdx])) ||
-            af::anyTrue<bool>(af::isNaN(batch[kTargetIdx]))) {
-          LOG(FATAL) << "Sample has NaN values - "
-                     << join(",", readSampleIds(batch[kSampleIdx]));
-        }
-
-        // forward
-        meters.fwdtimer.resume();
-        auto input = fl::input(batch[kInputIdx]);
-        if (FLAGS_saug_start_update >= 0 &&
-            curBatch >= FLAGS_saug_start_update) {
-          input = saug->forward(input);
-        }
-        auto output = ntwrk->forward({input}).front();
-        af::sync();
-        meters.critfwdtimer.resume();
-        auto loss =
-            crit->forward({output, fl::noGrad(batch[kTargetIdx])}).front();
-        af::sync();
-        meters.fwdtimer.stopAndIncUnit();
-        meters.critfwdtimer.stopAndIncUnit();
-
-        if (af::anyTrue<bool>(af::isNaN(loss.array()))) {
-          LOG(FATAL) << "Loss has NaN values. Samples - "
-                     << join(",", readSampleIds(batch[kSampleIdx]));
-        }
-        meters.train.loss.add(loss.array());
-
-        int64_t batchIdx = (curBatch - startUpdate - 1) % trainset->size();
-        int64_t globalBatchIdx = trainset->getGlobalBatchIdx(batchIdx);
-        if (trainEvalIds.find(globalBatchIdx) != trainEvalIds.end()) {
-          evalOutput(output.array(), batch[kTargetIdx], meters.train);
-        }
-
-        // backward
-        meters.bwdtimer.resume();
-        netopt->zeroGrad();
-        critopt->zeroGrad();
-        loss.backward();
+  auto train =
+      [&meters,
+       &test,
+       &logStatus,
+       &saveModels,
+       &evalOutput,
+       &validds,
+       &trainEvalIds,
+       &curEpoch,
+       &startUpdate,
+       reducer](
+          std::shared_ptr<fl::Module> ntwrk,
+          std::shared_ptr<SequenceCriterion> crit,
+          std::shared_ptr<W2lDataset> trainset,
+          std::shared_ptr<fl::FirstOrderOptimizer> netopt,
+          std::shared_ptr<fl::FirstOrderOptimizer> critopt,
+          double initlr,
+          double initcritlr,
+          bool clampCrit,
+          int64_t nbatches) {
         if (reducer) {
-          reducer->finalize();
+          fl::distributeModuleGrads(ntwrk, reducer);
+          fl::distributeModuleGrads(crit, reducer);
         }
-        af::sync();
-        meters.bwdtimer.stopAndIncUnit();
 
-        // optimizer
-        meters.optimtimer.resume();
+        meters.train.loss.reset();
+        meters.train.tknEdit.reset();
+        meters.train.wrdEdit.reset();
 
-        // scale down gradients by batchsize
-        for (const auto& p : ntwrk->params()) {
-          if (!p.isGradAvailable()) {
-            continue;
+        std::shared_ptr<fl::SpecAugment> saug;
+        if (FLAGS_saug_start_update >= 0) {
+          saug = std::make_shared<fl::SpecAugment>(
+              FLAGS_filterbanks,
+              FLAGS_saug_fmaskf,
+              FLAGS_saug_fmaskn,
+              FLAGS_saug_tmaskt,
+              FLAGS_saug_tmaskp,
+              FLAGS_saug_tmaskn);
+        }
+
+        fl::allReduceParameters(ntwrk);
+        fl::allReduceParameters(crit);
+
+        auto resetTimeStatMeters = [&meters]() {
+          meters.runtime.reset();
+          meters.stats.reset();
+          meters.sampletimer.reset();
+          meters.fwdtimer.reset();
+          meters.critfwdtimer.reset();
+          meters.bwdtimer.reset();
+          meters.optimtimer.reset();
+          meters.timer.reset();
+        };
+        auto runValAndSaveModel = [&](
+            int64_t totalEpochs,
+            int64_t totalUpdates,
+            double lr,
+            double lrcrit) {
+          meters.runtime.stop();
+          meters.timer.stop();
+          meters.sampletimer.stop();
+          meters.fwdtimer.stop();
+          meters.critfwdtimer.stop();
+          meters.bwdtimer.stop();
+          meters.optimtimer.stop();
+
+          // valid
+          for (auto& vds : validds) {
+            test(ntwrk, crit, vds.second, meters.valid[vds.first]);
           }
-          p.grad() = p.grad() / FLAGS_batchsize;
-        }
-        for (const auto& p : crit->params()) {
-          if (!p.isGradAvailable()) {
-            continue;
+
+          // print status
+          try {
+            logStatus(meters, totalEpochs, totalUpdates, lr, lrcrit);
+          } catch (const std::exception& ex) {
+            LOG(ERROR) << "Error while writing logs: " << ex.what();
           }
-          p.grad() = p.grad() / FLAGS_batchsize;
-        }
-
-        // clamp gradients
-        if (FLAGS_maxgradnorm > 0) {
-          auto params = ntwrk->params();
-          if (clampCrit) {
-            auto critparams = crit->params();
-            params.insert(params.end(), critparams.begin(), critparams.end());
+          // save last and best models
+          try {
+            saveModels(totalEpochs, totalUpdates);
+          } catch (const std::exception& ex) {
+            LOG(FATAL) << "Error while saving models: " << ex.what();
           }
-          fl::clipGradNorm(params, FLAGS_maxgradnorm);
-        }
+          // reset meters for next readings
+          meters.train.loss.reset();
+          meters.train.tknEdit.reset();
+          meters.train.wrdEdit.reset();
+        };
 
-        // update weights
-        critopt->step();
-        netopt->step();
-        af::sync();
-        meters.optimtimer.stopAndIncUnit();
-        meters.sampletimer.resume();
-
-        if (FLAGS_reportiters > 0 && curBatch % FLAGS_reportiters == 0) {
-          runValAndSaveModel(
-              curEpoch, curBatch, netopt->getLr(), critopt->getLr());
-          resetTimeStatMeters();
+        int64_t curBatch = startUpdate;
+        while (curBatch < nbatches) {
+          ++curEpoch; // counts partial epochs too!
+          int epochsAfterDecay = curEpoch - FLAGS_lr_decay;
+          double lrDecayScale =
+              std::pow(0.5, std::max(epochsAfterDecay, 0) / FLAGS_lr_decay_step);
           ntwrk->train();
           crit->train();
+          if (FLAGS_reportiters == 0) {
+            resetTimeStatMeters();
+          }
+          if (!FLAGS_noresample) {
+            LOG_MASTER(INFO) << "Shuffling trainset";
+            trainset->shuffle(curEpoch /* seed */);
+          }
+          af::sync();
           meters.sampletimer.resume();
           meters.runtime.resume();
           meters.timer.resume();
+          LOG_MASTER(INFO) << "Epoch " << curEpoch << " started!";
+          for (auto& batch : *trainset) {
+            ++curBatch;
+            double lrScheduleScale;
+            if (FLAGS_lrcosine) {
+              const double pi = std::acos(-1);
+              lrScheduleScale =
+                  std::cos(((double)curBatch) / ((double)nbatches) * pi / 2.0);
+            } else {
+              lrScheduleScale =
+                  std::pow(FLAGS_gamma, 
+                           (double)curBatch / (double)FLAGS_stepsize);
+            }
+            netopt->setLr(
+                initlr * lrDecayScale * lrScheduleScale *
+                std::min(curBatch / double(FLAGS_warmup), 1.0));
+            critopt->setLr(
+                initcritlr * lrDecayScale * lrScheduleScale *
+                std::min(curBatch / double(FLAGS_warmup), 1.0));
+            af::sync();
+            meters.timer.incUnit();
+            meters.sampletimer.stopAndIncUnit();
+            meters.stats.add(batch[kInputIdx], batch[kTargetIdx]);
+            if (af::anyTrue<bool>(af::isNaN(batch[kInputIdx])) ||
+                af::anyTrue<bool>(af::isNaN(batch[kTargetIdx]))) {
+              LOG(FATAL) << "Sample has NaN values - "
+                         << join(",", readSampleIds(batch[kSampleIdx]));
+            }
+
+            // forward
+            meters.fwdtimer.resume();
+            auto input = fl::input(batch[kInputIdx]);
+            if (FLAGS_saug_start_update >= 0 &&
+                curBatch >= FLAGS_saug_start_update) {
+              input = saug->forward(input);
+            }
+            auto output = ntwrk->forward({input}).front();
+            af::sync();
+            meters.critfwdtimer.resume();
+            auto loss =
+                crit->forward({output, fl::noGrad(batch[kTargetIdx])}).front();
+            af::sync();
+            meters.fwdtimer.stopAndIncUnit();
+            meters.critfwdtimer.stopAndIncUnit();
+
+            if (af::anyTrue<bool>(af::isNaN(loss.array()))) {
+              LOG(FATAL) << "Loss has NaN values. Samples - "
+                         << join(",", readSampleIds(batch[kSampleIdx]));
+            }
+            meters.train.loss.add(loss.array());
+
+            int64_t batchIdx = (curBatch - startUpdate - 1) % trainset->size();
+            int64_t globalBatchIdx = trainset->getGlobalBatchIdx(batchIdx);
+            if (trainEvalIds.find(globalBatchIdx) != trainEvalIds.end()) {
+              evalOutput(output.array(), batch[kTargetIdx], meters.train);
+            }
+
+            // backward
+            meters.bwdtimer.resume();
+            netopt->zeroGrad();
+            critopt->zeroGrad();
+            loss.backward();
+            if (reducer) {
+              reducer->finalize();
+            }
+            af::sync();
+            meters.bwdtimer.stopAndIncUnit();
+
+            // optimizer
+            meters.optimtimer.resume();
+
+            // scale down gradients by batchsize
+            for (const auto& p : ntwrk->params()) {
+              if (!p.isGradAvailable()) {
+                continue;
+              }
+              p.grad() = p.grad() / FLAGS_batchsize;
+            }
+            for (const auto& p : crit->params()) {
+              if (!p.isGradAvailable()) {
+                continue;
+              }
+              p.grad() = p.grad() / FLAGS_batchsize;
+            }
+
+            // clamp gradients
+            if (FLAGS_maxgradnorm > 0) {
+              auto params = ntwrk->params();
+              if (clampCrit) {
+                auto critparams = crit->params();
+                params.insert(
+                    params.end(), critparams.begin(), critparams.end());
+              }
+              fl::clipGradNorm(params, FLAGS_maxgradnorm);
+            }
+
+            // update weights
+            critopt->step();
+            netopt->step();
+            af::sync();
+            meters.optimtimer.stopAndIncUnit();
+            meters.sampletimer.resume();
+
+            if (FLAGS_reportiters > 0 && curBatch % FLAGS_reportiters == 0) {
+              runValAndSaveModel(
+                  curEpoch, curBatch, netopt->getLr(), critopt->getLr());
+              resetTimeStatMeters();
+              ntwrk->train();
+              crit->train();
+              meters.sampletimer.resume();
+              meters.runtime.resume();
+              meters.timer.resume();
+            }
+            if (curBatch > nbatches) {
+              break;
+            }
+          }
+          af::sync();
+          if (FLAGS_reportiters == 0) {
+            runValAndSaveModel(
+                curEpoch, curBatch, netopt->getLr(), critopt->getLr());
+          }
         }
-        if (curBatch > nbatches) {
-          break;
-        }
-      }
-      af::sync();
-      if (FLAGS_reportiters == 0) {
-        runValAndSaveModel(
-            curEpoch, curBatch, netopt->getLr(), critopt->getLr());
-      }
-    }
-  };
+      };
 
   /* ===================== Train ===================== */
   if (FLAGS_linseg - startUpdate > 0) {

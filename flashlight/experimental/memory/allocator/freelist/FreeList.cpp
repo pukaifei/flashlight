@@ -284,7 +284,7 @@ std::string FreeList::prettyString() const {
      << " maxFreeListSize_=" << maxFreeListSize_
      << " freeListSize_=" << freeListSize_ << " freeList_={";
   int chunkNum = 0;
-  for (Chunk* cur = freeList_; cur && (chunkNum < kPrettyStringMaxChunks);
+  for (Chunk *cur = freeList_; cur && (chunkNum < kPrettyStringMaxChunks);
        cur = cur->next_, ++chunkNum) {
     ss << cur->prettyString() << " ";
   }

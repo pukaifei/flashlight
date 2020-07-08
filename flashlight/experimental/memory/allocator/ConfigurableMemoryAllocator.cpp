@@ -148,9 +148,9 @@ MemoryAllocatorConfiguration MemoryAllocatorConfiguration::loadJSon(
     cereal::JSONInputArchive archive(streamToConfig);
     archive(config);
   } catch (std::exception& ex) {
-    LOG(ERROR)
-        << "MemoryAllocatorConfiguration::loadJSon() failed to load config with error="
-        << ex.what();
+    LOG(ERROR) << "MemoryAllocatorConfiguration::loadJSon() failed to load "
+                  "config with error="
+               << ex.what();
     throw ex;
   }
   return config;
@@ -162,9 +162,9 @@ void MemoryAllocatorConfiguration::saveJSon(
     cereal::JSONOutputArchive archive(saveConfigStream);
     archive(*this);
   } catch (std::exception& ex) {
-    LOG(ERROR)
-        << "MemoryAllocatorConfiguration::saveJSon() failed to save config with error="
-        << ex.what();
+    LOG(ERROR) << "MemoryAllocatorConfiguration::saveJSon() failed to save "
+                  "config with error="
+               << ex.what();
     throw ex;
   }
 }
@@ -281,7 +281,8 @@ void MemoryAllocatorConfiguration::normalize() {
       if ((subConfig.maxAllocationSize_ < subConfig.blockSize_) ||
           (subConfig.maxAllocationSize_ % subConfig.blockSize_)) {
         std::stringstream ss;
-        ss << "MemoryAllocatorConfiguration::normalize() invalid maxAllocationSize_="
+        ss << "MemoryAllocatorConfiguration::normalize() invalid "
+              "maxAllocationSize_="
            << subConfig.maxAllocationSize_
            << " must be in multiples of block size=" << subConfig.blockSize_
            << " config=" << prettyString();

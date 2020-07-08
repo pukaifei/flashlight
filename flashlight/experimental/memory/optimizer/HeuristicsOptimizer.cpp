@@ -36,7 +36,8 @@ bool splitSubArenaToReduceExternalFrag(
     std::stringstream ss;
     ss << "splitSubArena(allocatorConfig=" << allocatorConfig.prettyString()
        << " subArenaIndex=" << subArenaIndex
-       << ") subArenaIndex must be < allocatorConfig.subArenaConfiguration_.size()="
+       << ") subArenaIndex must be < "
+          "allocatorConfig.subArenaConfiguration_.size()="
        << allocatorConfig.subArenaConfiguration_.size();
     throw std::invalid_argument(ss.str());
   }
@@ -98,10 +99,10 @@ std::vector<MemoryAllocatorConfiguration> heuristicsSuggestOptimization(
               i,
               allocatorConfig.alignmentNumberOfBits_,
               &suggested)) {
-        LOG(INFO)
-            << "heuristicsSuggestOptimization() Handle high extrenal fragmentation."
-            << "\norig=" << allocatorConfig.prettyString()
-            << "\nsuggested=" << suggested.prettyString();
+        LOG(INFO) << "heuristicsSuggestOptimization() Handle high extrenal "
+                     "fragmentation."
+                  << "\norig=" << allocatorConfig.prettyString()
+                  << "\nsuggested=" << suggested.prettyString();
 
         suggestions.push_back(std::move(suggested));
 
@@ -122,10 +123,10 @@ std::vector<MemoryAllocatorConfiguration> heuristicsSuggestOptimization(
         suggested.subArenaConfiguration_.at(i).blockSize_ =
             ((minBlockSizeCnt - 1) << allocatorConfig.alignmentNumberOfBits_);
 
-        LOG(INFO)
-            << "heuristicsSuggestOptimization() Handle high internal fragmentation."
-            << "\norig=" << allocatorConfig.prettyString()
-            << "\nsuggested=" << suggested.prettyString();
+        LOG(INFO) << "heuristicsSuggestOptimization() Handle high internal "
+                     "fragmentation."
+                  << "\norig=" << allocatorConfig.prettyString()
+                  << "\nsuggested=" << suggested.prettyString();
 
         suggestions.push_back(std::move(suggested));
 
