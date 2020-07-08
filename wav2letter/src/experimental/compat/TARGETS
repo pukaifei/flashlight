@@ -1,0 +1,19 @@
+load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
+
+cpp_library(
+    name = "compat",
+    srcs = [
+        "Compat.cpp",
+        "PositionEmbeddingLayer.cpp",
+        "TransformerLayer.cpp",
+    ],
+    headers = [
+        "Compat.h",
+        "PositionEmbeddingLayer.h",
+        "TransformerLayer.h",
+    ],
+    deps = [
+        "//deeplearning/projects/flashlight:flashlight",
+        "//deeplearning/projects/wav2letter/src/common:common",
+    ],
+)
