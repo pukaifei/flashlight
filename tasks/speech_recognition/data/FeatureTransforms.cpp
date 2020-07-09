@@ -11,13 +11,41 @@
 #include <algorithm>
 #include <stdexcept>
 
-#include "common/Transforms.h"
-#include "libraries/common/Utils.h"
-#include "libraries/feature/Mfcc.h"
-#include "libraries/feature/Mfsc.h"
-#include "libraries/feature/PowerSpectrum.h"
+#include "libraries/audio/feature/Mfcc.h"
+#include "libraries/audio/feature/Mfsc.h"
+#include "libraries/audio/feature/PowerSpectrum.h"
+#include "libraries/common/String.h"
 
-namespace w2l {
+using namespace fl::lib;
+
+namespace {
+
+// Input: B x inRow x inCol (Row Major), Output: B x inCol x inRow (Row Major)
+template <typename T>
+std::vector<T> transpose2d(
+    const std::vector<T>& in,
+    int64_t inRow,
+    int64_t inCol,
+    int64_t inBatch = 1) {
+  if (in.size() != inRow * inCol * inBatch) {
+    throw std::invalid_argument("Invalid input size");
+  }
+  std::vector<T> out(in.size());
+  for (size_t b = 0; b < inBatch; ++b) {
+    int64_t start = b * inRow * inCol;
+    for (size_t c = 0; c < inCol; ++c) {
+      for (size_t r = 0; r < inRow; ++r) {
+        out[start + c * inRow + r] = in[start + r * inCol + c];
+      }
+    }
+  }
+  return out;
+}
+} // namespace
+
+namespace fl {
+namespace task {
+namespace asr {
 
 fl::Dataset::DataTransformFunction inputFeatures(const FeatureParams& params) {
   return [params](void* data, af::dim4 dims, af::dtype type) {
@@ -75,4 +103,6 @@ fl::Dataset::DataTransformFunction targetFeatures(
     return af::array(tokens.size(), tokens.data());
   };
 }
-} // namespace w2l
+} // namespace asr
+} // namespace task
+} // namespace fl

@@ -10,7 +10,9 @@
 
 using namespace fl;
 
-namespace w2l {
+namespace fl {
+namespace task {
+namespace asr {
 
 MedianWindow::MedianWindow() {}
 MedianWindow::MedianWindow(int wL, int wR) : wL_(wL), wR_(wR) {}
@@ -72,5 +74,6 @@ Variable MedianWindow::computeWindowMask(
     int /* unused */) {
   throw af::exception("MedianWindow does not support vectorized window mask");
 }
-
-} // namespace w2l
+} // namespace asr
+} // namespace task
+} // namespace fl

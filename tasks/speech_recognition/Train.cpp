@@ -14,20 +14,25 @@
 
 #include <cereal/archives/json.hpp>
 #include <cereal/types/unordered_map.hpp>
+#include <flashlight/contrib/contrib.h>
 #include <flashlight/flashlight.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include "common/Defines.h"
-#include "common/FlashlightUtils.h"
-#include "common/Transforms.h"
 #include "criterion/criterion.h"
-#include "data/Featurize.h"
-#include "libraries/common/Dictionary.h"
-#include "module/module.h"
+#include "decoder/Utils.h"
 #include "runtime/runtime.h"
 
-using namespace w2l;
+#include "extensions/common/SequentialBuilder.h"
+#include "extensions/common/Utils.h"
+#include "libraries/common/System.h"
+#include "libraries/language/dictionary/Dictionary.h"
+#include "libraries/language/dictionary/Utils.h"
+
+using namespace fl::ext;
+using namespace fl::lib;
+using namespace fl::task::asr;
 
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
@@ -69,7 +74,7 @@ int main(int argc, char** argv) {
     reloadPath = getRunFile("model_last.bin", runIdx - 1, runPath);
     LOG(INFO) << "reload path is " << reloadPath;
     std::unordered_map<std::string, std::string> cfg;
-    W2lSerializer::load(reloadPath, cfg);
+    Serializer::load(reloadPath, cfg);
     auto flags = cfg.find(kGflags);
     if (flags == cfg.end()) {
       LOG(FATAL) << "Invalid config loaded from " << reloadPath;
@@ -101,7 +106,7 @@ int main(int argc, char** argv) {
   } else if (runStatus == kForkMode) {
     reloadPath = argv[2];
     std::unordered_map<std::string, std::string> cfg;
-    W2lSerializer::load(reloadPath, cfg);
+    Serializer::load(reloadPath, cfg);
     auto flags = cfg.find(kGflags);
     if (flags == cfg.end()) {
       LOG(FATAL) << "Invalid config loaded from " << reloadPath;
@@ -128,7 +133,7 @@ int main(int argc, char** argv) {
   // Only new flags are re-serialized. Copy any values from deprecated flags to
   // new flags when deprecated flags are present and corresponding new flags
   // aren't
-  w2l::handleDeprecatedFlags();
+  handleDeprecatedFlags();
 
   af::setSeed(FLAGS_seed);
   af::setFFTPlanCacheSize(FLAGS_fftcachesize);
@@ -220,7 +225,7 @@ int main(int argc, char** argv) {
     LOG_MASTER(INFO) << "Loading architecture file from " << archfile;
     auto numFeatures = getSpeechFeatureSize();
     // Encoder network, works on audio
-    network = createW2lSeqModule(archfile, numFeatures, numClasses);
+    network = buildSequentialModule(archfile, numFeatures, numClasses);
 
     if (FLAGS_criterion == kCtcCriterion) {
       criterion = std::make_shared<CTCLoss>(scalemode);
@@ -243,11 +248,10 @@ int main(int argc, char** argv) {
     }
   } else if (runStatus == kForkMode) {
     std::unordered_map<std::string, std::string> cfg; // unused
-    W2lSerializer::load(reloadPath, cfg, network, criterion);
+    Serializer::load(reloadPath, cfg, network, criterion);
   } else { // kContinueMode
     std::unordered_map<std::string, std::string> cfg; // unused
-    W2lSerializer::load(
-        reloadPath, cfg, network, criterion, netoptim, critoptim);
+    Serializer::load(reloadPath, cfg, network, criterion, netoptim, critoptim);
   }
   LOG_MASTER(INFO) << "[Network] " << network->prettyString();
   LOG_MASTER(INFO) << "[Network Params: " << numTotalParams(network) << "]";
@@ -358,13 +362,13 @@ int main(int argc, char** argv) {
       if (FLAGS_itersave) {
         filename =
             getRunFile(format("model_iter_%03d.bin", iter), runIdx, runPath);
-        W2lSerializer::save(
+        Serializer::save(
             filename, config, network, criterion, netoptim, critoptim);
       }
 
       // save last model
       filename = getRunFile("model_last.bin", runIdx, runPath);
-      W2lSerializer::save(
+      Serializer::save(
           filename, config, network, criterion, netoptim, critoptim);
 
       // save if better than ever for one valid
@@ -375,7 +379,7 @@ int main(int argc, char** argv) {
           std::string cleaned_v = cleanFilepath(v.first);
           std::string vfname =
               getRunFile("model_" + cleaned_v + ".bin", runIdx, runPath);
-          W2lSerializer::save(
+          Serializer::save(
               vfname, config, network, criterion, netoptim, critoptim);
         }
       }
@@ -397,7 +401,7 @@ int main(int argc, char** argv) {
     trainds->shuffle(FLAGS_seed);
   }
 
-  std::map<std::string, std::shared_ptr<W2lDataset>> validds;
+  std::map<std::string, std::shared_ptr<Dataset>> validds;
   for (const auto& s : validTagSets) {
     validds[s.first] = createDataset(
         s.second, dicts, lexicon, FLAGS_batchsize, worldRank, worldSize);
@@ -439,7 +443,7 @@ int main(int argc, char** argv) {
   auto test = [&evalOutput](
                   std::shared_ptr<fl::Module> ntwrk,
                   std::shared_ptr<SequenceCriterion> crit,
-                  std::shared_ptr<W2lDataset> testds,
+                  std::shared_ptr<Dataset> testds,
                   DatasetMeters& mtrs) {
     ntwrk->eval();
     crit->eval();
@@ -474,7 +478,7 @@ int main(int argc, char** argv) {
                 reducer](
                    std::shared_ptr<fl::Module> ntwrk,
                    std::shared_ptr<SequenceCriterion> crit,
-                   std::shared_ptr<W2lDataset> trainset,
+                   std::shared_ptr<Dataset> trainset,
                    std::shared_ptr<fl::FirstOrderOptimizer> netopt,
                    std::shared_ptr<fl::FirstOrderOptimizer> critopt,
                    double initlr,
@@ -490,9 +494,9 @@ int main(int argc, char** argv) {
     meters.train.tknEdit.reset();
     meters.train.wrdEdit.reset();
 
-    std::shared_ptr<SpecAugment> saug;
+    std::shared_ptr<fl::SpecAugment> saug;
     if (FLAGS_saug_start_update >= 0) {
-      saug = std::make_shared<SpecAugment>(
+      saug = std::make_shared<fl::SpecAugment>(
           FLAGS_filterbanks,
           FLAGS_saug_fmaskf,
           FLAGS_saug_fmaskn,
@@ -574,14 +578,14 @@ int main(int argc, char** argv) {
         double lrScheduleScale;
         if (FLAGS_lrcosine) {
           const double pi = std::acos(-1);
-          lrScheduleScale =
+          lrScheduleScale = 
               std::cos(((double)curBatch) / ((double)nbatches) * pi / 2.0);
         } else {
-          lrScheduleScale =
+          lrScheduleScale = 
               std::pow(FLAGS_gamma, (double)curBatch / (double)FLAGS_stepsize);
         }
         netopt->setLr(
-            initlr * lrDecayScale * lrScheduleScale *
+            initlr * lrDecayScale * lrScheduleScale * 
             std::min(curBatch / double(FLAGS_warmup), 1.0));
         critopt->setLr(
             initcritlr * lrDecayScale * lrScheduleScale *

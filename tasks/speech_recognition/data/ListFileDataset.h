@@ -13,10 +13,11 @@
 
 #include <flashlight/flashlight.h>
 
-#include "libraries/common/Dictionary.h"
-#include "libraries/common/Utils.h"
+#include "libraries/language/dictionary/Dictionary.h"
 
-namespace w2l {
+namespace fl {
+namespace task {
+namespace asr {
 
 /**
  *
@@ -67,4 +68,6 @@ class ListFileDataset : public fl::Dataset {
   std::vector<std::string> targets_;
   std::vector<double> sizes_;
 };
-} // namespace w2l
+} // namespace asr
+} // namespace task
+} // namespace fl

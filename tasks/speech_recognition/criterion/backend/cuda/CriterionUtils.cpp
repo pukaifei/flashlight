@@ -10,13 +10,15 @@
 
 #include <flashlight/common/cuda.h>
 
-#include "libraries/criterion/cuda/CriterionUtils.cuh"
-#include "libraries/criterion/cuda/ViterbiPath.cuh"
+#include "libraries/audio/criterion/cuda/CriterionUtils.cuh"
+#include "libraries/audio/criterion/cuda/ViterbiPath.cuh"
 
-using CriterionUtils = w2l::cuda::CriterionUtils<float>;
-using ViterbiPath = w2l::cuda::ViterbiPath<float>;
+using CriterionUtils = fl::lib::cuda::CriterionUtils<float>;
+using ViterbiPath = fl::lib::cuda::ViterbiPath<float>;
 
-namespace w2l {
+namespace fl {
+namespace task {
+namespace asr {
 
 af::array viterbiPath(const af::array& input, const af::array& trans) {
   auto B = input.dims(2);
@@ -75,5 +77,6 @@ af::array getTargetSizeArray(const af::array& target, int maxSize) {
 
   return targetSize;
 }
-
-} // namespace w2l
+} // namespace asr
+} // namespace task
+} // namespace fl

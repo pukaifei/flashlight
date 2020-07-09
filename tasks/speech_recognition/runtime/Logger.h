@@ -16,7 +16,9 @@
 
 #define LOG_MASTER(lvl) LOG_IF(lvl, (fl::getWorldRank() == 0))
 
-namespace w2l {
+namespace fl {
+namespace task {
+namespace asr {
 struct DatasetMeters {
   fl::EditDistanceMeter tknEdit, wrdEdit;
   fl::AverageValueMeter loss;
@@ -57,29 +59,10 @@ std::pair<std::string, std::string> getStatus(
 
 void appendToLog(std::ofstream& logfile, const std::string& logstr);
 
-af::array allreduceGet(fl::AverageValueMeter& mtr);
-af::array allreduceGet(fl::EditDistanceMeter& mtr);
 af::array allreduceGet(SpeechStatMeter& mtr);
-af::array allreduceGet(fl::CountMeter& mtr);
-af::array allreduceGet(fl::TimeMeter& mtr);
-
-void allreduceSet(fl::AverageValueMeter& mtr, af::array& val);
-void allreduceSet(fl::EditDistanceMeter& mtr, af::array& val);
 void allreduceSet(SpeechStatMeter& mtr, af::array& val);
-void allreduceSet(fl::CountMeter& mtr, af::array& val);
-void allreduceSet(fl::TimeMeter& mtr, af::array& val);
 
-template <typename T>
-void syncMeter(T& mtr) {
-  if (!fl::isDistributedInit()) {
-    return;
-  }
-  af::array arr = allreduceGet(mtr);
-  fl::allReduce(arr);
-  allreduceSet(mtr, arr);
-}
-
-template <>
-void syncMeter<TrainMeters>(TrainMeters& mtrs);
-
-} // namespace w2l
+void syncMeter(TrainMeters& mtrs);
+} // namespace asr
+} // namespace task
+} // namespace fl

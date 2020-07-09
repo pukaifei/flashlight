@@ -4,6 +4,10 @@
 
 #include "data/Sound.h"
 
+#include "libraries/common/String.h"
+
+using namespace fl::lib;
+
 namespace {
 constexpr const size_t kIdIdx = 0;
 constexpr const size_t kInIdx = 1;
@@ -16,7 +20,9 @@ af::array toArray(const std::string& str) {
 }
 } // namespace
 
-namespace w2l {
+namespace fl {
+namespace task {
+namespace asr {
 
 ListFileDataset::ListFileDataset(
     const std::string& filename,
@@ -32,7 +38,7 @@ ListFileDataset::ListFileDataset(
     if (line.empty()) {
       continue;
     }
-    auto splits = w2l::splitOnWhitespace(line, true);
+    auto splits = splitOnWhitespace(line, true);
     if (splits.size() < kNumCols) {
       throw std::runtime_error("Invalid line: " + line);
     }
@@ -40,7 +46,7 @@ ListFileDataset::ListFileDataset(
     ids_.emplace_back(std::move(splits[kIdIdx]));
     inputs_.emplace_back(std::move(splits[kInIdx]));
     sizes_.emplace_back(std::stod(splits[kSzIdx]));
-    targets_.emplace_back(w2l::join(
+    targets_.emplace_back(lib::join(
         " ", std::vector<std::string>(splits.begin() + kTgtIdx, splits.end())));
     ++numRows_;
   }
@@ -84,8 +90,9 @@ const std::vector<double>& ListFileDataset::getSampleSizes() const {
 
 std::pair<std::vector<float>, af::dim4> ListFileDataset::loadAudio(
     const std::string& handle) const {
-  auto info = w2l::loadSoundInfo(handle.c_str());
-  return {w2l::loadSound<float>(handle.c_str()), {info.channels, info.frames}};
+  auto info = loadSoundInfo(handle.c_str());
+  return {loadSound<float>(handle.c_str()), {info.channels, info.frames}};
 }
-
-} // namespace w2l
+} // namespace asr
+} // namespace task
+} // namespace fl

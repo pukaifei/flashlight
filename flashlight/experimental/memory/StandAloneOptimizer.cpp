@@ -159,9 +159,9 @@ int writeTemplateConfigFile() {
                                  << kOptimizerConfigFilename;
   const std::string optimizerConfigFilename =
       optimizerConfigFilenameBuilder.str();
-  LOG(INFO)
-      << "Writing a MemoryOptimizerConfiguration templates for your convenience to="
-      << optimizerConfigFilename;
+  LOG(INFO) << "Writing a MemoryOptimizerConfiguration templates for your "
+               "convenience to="
+            << optimizerConfigFilename;
 
   MemoryOptimizerConfiguration optimizerConfig;
   optimizerConfig.memorySize = 16521541376; // (15GB+396MB+173KB+768)
@@ -234,9 +234,9 @@ StandAloneOptimizerConfig StandAloneOptimizerConfig::loadJSon(
     cereal::JSONInputArchive archive(streamToConfig);
     archive(config);
   } catch (std::exception& ex) {
-    LOG(ERROR)
-        << "StandAloneOptimizerConfig::loadJSon() failed to load config with error="
-        << ex.what();
+    LOG(ERROR) << "StandAloneOptimizerConfig::loadJSon() failed to load config "
+                  "with error="
+               << ex.what();
     throw ex;
   }
   return config;
@@ -247,9 +247,9 @@ void StandAloneOptimizerConfig::saveJSon(std::ostream& saveConfigStream) const {
     cereal::JSONOutputArchive archive(saveConfigStream);
     archive(*this);
   } catch (std::exception& ex) {
-    LOG(ERROR)
-        << "StandAloneOptimizerConfig::saveJSon() failed to save config with error="
-        << ex.what();
+    LOG(ERROR) << "StandAloneOptimizerConfig::saveJSon() failed to save config "
+                  "with error="
+               << ex.what();
     throw ex;
   }
 }

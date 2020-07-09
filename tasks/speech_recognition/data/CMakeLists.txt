@@ -32,28 +32,29 @@ endif ()
 # ----------------------------- Lib -----------------------------
 
 add_library(
-  data
+  asr-data
   INTERFACE
   )
 
 target_sources(
-  data
+  asr-data
   INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/Featurize.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/FeatureTransforms.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ListFileDataset.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Sound.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/SpeechSample.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Utils.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/W2lDataset.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/W2lBlobsDataset.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/W2lListFilesDataset.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/Dataset.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/BlobsDataset.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/ListFilesDataset.cpp
   )
 
 target_link_libraries(
-  data
+  asr-data
   INTERFACE
-  common
-  feature-library
-  flashlight::flashlight
+  asr-common
+  flashlight
   ${GLOG_LIBRARIES}
   ${MKL_LIBRARIES}
   ${SNDFILE_LIBRARIES}
@@ -61,7 +62,7 @@ target_link_libraries(
   )
 
 target_include_directories(
-  data
+  asr-data
   INTERFACE
   ${MKL_INCLUDE_DIR}
   ${SNDFILE_INCLUDE_DIRS}

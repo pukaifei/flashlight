@@ -12,7 +12,9 @@
 
 using namespace fl;
 
-namespace w2l {
+namespace fl {
+namespace task {
+namespace asr {
 
 MultiHeadContentAttention::MultiHeadContentAttention(
     int dim,
@@ -89,5 +91,6 @@ std::pair<Variable, Variable> MultiHeadContentAttention::forward(
 std::string MultiHeadContentAttention::prettyString() const {
   return "MultiHeadContentAttention";
 }
-
-} // namespace w2l
+} // namespace asr
+} // namespace task
+} // namespace fl

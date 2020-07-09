@@ -10,7 +10,9 @@
 
 using namespace fl;
 
-namespace w2l {
+namespace fl {
+namespace task {
+namespace asr {
 
 SoftPretrainWindow::SoftPretrainWindow(double std) : std_(std) {}
 
@@ -41,5 +43,6 @@ Variable SoftPretrainWindow::computeWindowMask(
   // [targetLen, inputSteps, batchSize]
   return Variable(tile(maskArray, {1, 1, batchSize}), false);
 }
-
-} // namespace w2l
+} // namespace asr
+} // namespace task
+} // namespace fl

@@ -2,21 +2,24 @@ cmake_minimum_required(VERSION 3.5.1)
 
 # Main library
 add_library(
-  criterion
+  asr-criterion
   INTERFACE
   )
 
 # ---------------------------- Backend-specific -----------------------------
+if (FLASHLIGHT_BACKEND STREQUAL "CUDA")
+  set(FLASHLIGHT_USE_CUDA ON)
+endif ()
 
 if (FLASHLIGHT_USE_CUDA)
   # Build WarpCTC
-  set(WARPCTC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/warpctc)
+  set(WARPCTC_DIR ${PROJECT_SOURCE_DIR}/third_party/warpctc)
   message(STATUS "Adding warpctc:")
-  add_subdirectory(${WARPCTC_DIR} ${PROJECT_BINARY_DIR}/src/third_party/warpctc)
+  add_subdirectory(${WARPCTC_DIR} ${PROJECT_BINARY_DIR}/third_party/warpctc)
   set(WARPCTC_INCLUDE_DIR ${WARPCTC_DIR}/include)
 
   target_sources(
-    criterion
+    asr-criterion
     INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/backend/cuda/ConnectionistTemporalClassificationCriterion.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/backend/cuda/CriterionUtils.cpp
@@ -25,23 +28,23 @@ if (FLASHLIGHT_USE_CUDA)
     )
 
   target_link_libraries(
-    criterion
+    asr-criterion
     INTERFACE
     ${CUDA_LIBRARIES}
     warpctc # added directly from subdir
     # Can remove once CTC constrained Viterbi is implemented in CUDA T62268085
-    criterion-library
     )
 
   target_include_directories(
-    criterion
+    asr-criterion
     INTERFACE
     ${CUDA_INCLUDE_DIRS}
     ${WARPCTC_INCLUDE_DIR}
+    # ${CMAKE_SOURCE_DIR}/flashlight
     )
 elseif (FLASHLIGHT_USE_CPU)
   target_sources(
-    criterion
+    asr-criterion
     INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/backend/cpu/ConnectionistTemporalClassificationCriterion.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/backend/cpu/CriterionUtils.cpp
@@ -58,7 +61,7 @@ endif ()
 # ----------------------------- Lib -----------------------------
 
 target_sources(
-  criterion
+  asr-criterion
   INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/ConnectionistTemporalClassificationCriterion.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/CriterionUtils.cpp
@@ -71,20 +74,20 @@ target_sources(
   )
 
 target_link_libraries(
-  criterion
+  asr-criterion
   INTERFACE
-  attention
-  window
-  common
-  wav2letter-libraries
-  flashlight::flashlight
+  asr-attention
+  asr-window
+  asr-common
+  flashlight
   ${GLOG_LIBRARIES}
   ${cereal_LIBRARIES}
   )
 
 target_include_directories(
-  criterion
+  asr-criterion
   INTERFACE
+  # ${PROJECT_SOURCE_DIR}
   ${GLOG_INCLUDE_DIRS}
   ${cereal_INCLUDE_DIRS}
   )
@@ -92,12 +95,12 @@ target_include_directories(
 # ---------------------------- Attention/Window -----------------------------
 # Attention
 add_library(
-  attention
+  asr-attention
   INTERFACE
   )
 
 target_sources(
-  attention
+  asr-attention
   INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/attention/ContentAttention.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/attention/LocationAttention.cpp
@@ -105,7 +108,7 @@ target_sources(
   )
 
 target_include_directories(
-  attention
+  asr-attention
   INTERFACE
   attention
   src/flashlight
@@ -113,21 +116,21 @@ target_include_directories(
   )
 
 target_link_libraries(
-  attention
+  asr-attention
   INTERFACE
-  flashlight::flashlight
-  common
+  flashlight
+  asr-common
   ${cereal_LIBRARIES}
   )
 
 # Window
 add_library(
-  window
+  asr-window
   INTERFACE
   )
 
 target_sources(
-  window
+  asr-window
   INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/attention/MedianWindow.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/attention/SoftPretrainWindow.cpp
@@ -136,17 +139,17 @@ target_sources(
   )
 
 target_include_directories(
-  window
+  asr-window
   INTERFACE
-  attention
-  src/flashlight
+  asr-attention
+  # ${CMAKE_SOURCE_DIR}
   ${cereal_INCLUDE_DIRS}
   )
 
 target_link_libraries(
-  window
+  asr-window
   INTERFACE
-  flashlight::flashlight
-  common
+  flashlight
+  asr-common
   ${cereal_LIBRARIES}
   )

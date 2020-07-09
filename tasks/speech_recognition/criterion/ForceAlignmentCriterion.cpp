@@ -8,11 +8,13 @@
 
 #include "criterion/ForceAlignmentCriterion.h"
 
-namespace w2l {
+namespace fl {
+namespace task {
+namespace asr {
 
 ForceAlignmentCriterion::ForceAlignmentCriterion(
     int N,
-    w2l::CriterionScaleMode scalemode)
+    fl::lib::CriterionScaleMode scalemode)
     : N_(N), scaleMode_(scalemode) {
   if (N_ <= 0) {
     throw std::invalid_argument(
@@ -25,5 +27,6 @@ ForceAlignmentCriterion::ForceAlignmentCriterion(
 std::string ForceAlignmentCriterion::prettyString() const {
   return "ForceAlignmentCriterion";
 }
-
-} // namespace w2l
+} // namespace asr
+} // namespace task
+} // namespace fl

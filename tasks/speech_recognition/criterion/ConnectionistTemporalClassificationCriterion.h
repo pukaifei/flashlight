@@ -12,12 +12,15 @@
 #include "Defines.h"
 #include "SequenceCriterion.h"
 
-namespace w2l {
+namespace fl {
+namespace task {
+namespace asr {
 
 class ConnectionistTemporalClassificationCriterion : public SequenceCriterion {
  public:
   ConnectionistTemporalClassificationCriterion(
-      w2l::CriterionScaleMode scalemode = w2l::CriterionScaleMode::NONE);
+      fl::lib::CriterionScaleMode scalemode =
+          fl::lib::CriterionScaleMode::NONE);
 
   std::vector<fl::Variable> forward(
       const std::vector<fl::Variable>& inputs) override;
@@ -29,7 +32,7 @@ class ConnectionistTemporalClassificationCriterion : public SequenceCriterion {
   std::string prettyString() const override;
 
  private:
-  w2l::CriterionScaleMode scaleMode_;
+  fl::lib::CriterionScaleMode scaleMode_;
 
   FL_SAVE_LOAD_WITH_BASE(SequenceCriterion, scaleMode_)
 
@@ -37,7 +40,9 @@ class ConnectionistTemporalClassificationCriterion : public SequenceCriterion {
 };
 
 typedef ConnectionistTemporalClassificationCriterion CTCLoss;
+} // namespace asr
+} // namespace task
+} // namespace fl
 
-} // namespace w2l
-
-CEREAL_REGISTER_TYPE(w2l::ConnectionistTemporalClassificationCriterion)
+CEREAL_REGISTER_TYPE(
+    fl::task::asr::ConnectionistTemporalClassificationCriterion)

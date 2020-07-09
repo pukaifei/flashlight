@@ -8,12 +8,12 @@
 
 #include "criterion/FullConnectionCriterion.h"
 
-#include "common/FlashlightUtils.h"
+#include "common/Utils.h"
 #include "criterion/CriterionUtils.h"
-#include "libraries/criterion/cpu/FullConnectionCriterion.h"
+#include "libraries/audio/criterion/cpu/FullConnectionCriterion.h"
 
 using fl::Variable;
-using FCC = w2l::cpu::FullConnectionCriterion<float>;
+using FCC = fl::lib::cpu::FullConnectionCriterion<float>;
 
 namespace {
 // By passing shared_ptr<Context> we avoid copies from forward to backward.
@@ -23,7 +23,9 @@ struct Context {
 };
 } // namespace
 
-namespace w2l {
+namespace fl {
+namespace task {
+namespace asr {
 
 static void backward(
     std::vector<Variable>& inputs,
@@ -36,7 +38,7 @@ static void backward(
     throw std::invalid_argument("FCC: grad must be float32");
   }
 
-  auto gradVec = afToVector<float>(gradVar);
+  auto gradVec = fl::task::asr::afToVector<float>(gradVar);
   std::vector<float> inputGradVec(B * T * N);
   std::vector<float> transGradVec(N * N);
 
@@ -75,10 +77,10 @@ Variable FullConnectionCriterion::forward(
 
   const auto& targetSize = getTargetSizeArray(targetVar.array(), T);
   auto ctx = std::make_shared<Context>();
-  auto inputVec = afToVector<float>(inputVar);
-  auto targetVec = afToVector<int>(targetVar);
-  auto targetSizeVec = afToVector<int>(targetSize);
-  ctx->transVec = afToVector<float>(transVar);
+  auto inputVec = fl::task::asr::afToVector<float>(inputVar);
+  auto targetVec = fl::task::asr::afToVector<int>(targetVar);
+  auto targetSizeVec = fl::task::asr::afToVector<int>(targetSize);
+  ctx->transVec = fl::task::asr::afToVector<float>(transVar);
   std::vector<float> lossVec(B);
   ctx->workspaceVec.assign(FCC::getWorkspaceSize(B, T, N), 0);
 
@@ -100,5 +102,6 @@ Variable FullConnectionCriterion::forward(
         backward(inputs, gradVar, B, T, N, ctx);
       });
 }
-
-} // namespace w2l
+} // namespace asr
+} // namespace task
+} // namespace fl

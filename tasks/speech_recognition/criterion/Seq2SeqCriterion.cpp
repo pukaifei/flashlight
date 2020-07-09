@@ -7,44 +7,54 @@
  */
 
 #include "Seq2SeqCriterion.h"
+
 #include <algorithm>
 #include <numeric>
 #include <queue>
 
-using namespace fl;
+#include "common/Defines.h"
 
-namespace w2l {
+using namespace fl;
+using namespace fl::ext;
+
+namespace fl {
+namespace task {
+namespace asr {
 
 namespace detail {
 std::shared_ptr<AttentionBase> buildAttention() {
   std::shared_ptr<AttentionBase> attention;
-  if (FLAGS_attention == w2l::kContentAttention) {
+  if (FLAGS_attention == fl::task::asr::kContentAttention) {
     attention = std::make_shared<ContentAttention>();
-  } else if (FLAGS_attention == w2l::kKeyValueAttention) {
+  } else if (FLAGS_attention == fl::task::asr::kKeyValueAttention) {
     attention = std::make_shared<ContentAttention>(true);
-  } else if (FLAGS_attention == w2l::kNeuralContentAttention) {
+  } else if (FLAGS_attention == fl::task::asr::kNeuralContentAttention) {
     attention = std::make_shared<NeuralContentAttention>(FLAGS_encoderdim);
-  } else if (FLAGS_attention == w2l::kSimpleLocationAttention) {
+  } else if (FLAGS_attention == fl::task::asr::kSimpleLocationAttention) {
     attention = std::make_shared<SimpleLocationAttention>(FLAGS_attnconvkernel);
-  } else if (FLAGS_attention == w2l::kLocationAttention) {
+  } else if (FLAGS_attention == fl::task::asr::kLocationAttention) {
     attention = std::make_shared<LocationAttention>(
         FLAGS_encoderdim, FLAGS_attnconvkernel);
-  } else if (FLAGS_attention == w2l::kNeuralLocationAttention) {
+  } else if (FLAGS_attention == fl::task::asr::kNeuralLocationAttention) {
     attention = std::make_shared<NeuralLocationAttention>(
         FLAGS_encoderdim,
         FLAGS_attndim,
         FLAGS_attnconvchannel,
         FLAGS_attnconvkernel);
-  } else if (FLAGS_attention == w2l::kMultiHeadContentAttention) {
+  } else if (FLAGS_attention == fl::task::asr::kMultiHeadContentAttention) {
     attention = std::make_shared<MultiHeadContentAttention>(
         FLAGS_encoderdim, FLAGS_numattnhead);
-  } else if (FLAGS_attention == w2l::kMultiHeadKeyValueContentAttention) {
+  } else if (
+      FLAGS_attention == fl::task::asr::kMultiHeadKeyValueContentAttention) {
     attention = std::make_shared<MultiHeadContentAttention>(
         FLAGS_encoderdim, FLAGS_numattnhead, true);
-  } else if (FLAGS_attention == w2l::kMultiHeadSplitContentAttention) {
+  } else if (
+      FLAGS_attention == fl::task::asr::kMultiHeadSplitContentAttention) {
     attention = std::make_shared<MultiHeadContentAttention>(
         FLAGS_encoderdim, FLAGS_numattnhead, false, true);
-  } else if (FLAGS_attention == w2l::kMultiHeadKeyValueSplitContentAttention) {
+  } else if (
+      FLAGS_attention ==
+      fl::task::asr::kMultiHeadKeyValueSplitContentAttention) {
     attention = std::make_shared<MultiHeadContentAttention>(
         FLAGS_encoderdim, FLAGS_numattnhead, true, true);
   } else {
@@ -56,18 +66,18 @@ std::shared_ptr<AttentionBase> buildAttention() {
 
 std::shared_ptr<WindowBase> buildWindow() {
   std::shared_ptr<WindowBase> window;
-  if (FLAGS_attnWindow == w2l::kNoWindow) {
+  if (FLAGS_attnWindow == fl::task::asr::kNoWindow) {
     window = nullptr;
-  } else if (FLAGS_attnWindow == w2l::kMedianWindow) {
+  } else if (FLAGS_attnWindow == fl::task::asr::kMedianWindow) {
     window = std::make_shared<MedianWindow>(
         FLAGS_leftWindowSize, FLAGS_rightWindowSize);
-  } else if (FLAGS_attnWindow == w2l::kStepWindow) {
+  } else if (FLAGS_attnWindow == fl::task::asr::kStepWindow) {
     window = std::make_shared<StepWindow>(
         FLAGS_minsil, FLAGS_maxsil, FLAGS_minrate, FLAGS_maxrate);
-  } else if (FLAGS_attnWindow == w2l::kSoftWindow) {
+  } else if (FLAGS_attnWindow == fl::task::asr::kSoftWindow) {
     window = std::make_shared<SoftWindow>(
         FLAGS_softwstd, FLAGS_softwrate, FLAGS_softwoffset);
-  } else if (FLAGS_attnWindow == w2l::kSoftPretrainWindow) {
+  } else if (FLAGS_attnWindow == fl::task::asr::kSoftPretrainWindow) {
     window = std::make_shared<SoftPretrainWindow>(FLAGS_softwstd);
   } else {
     throw std::runtime_error("Unimplmented window: " + FLAGS_attnWindow);
@@ -159,7 +169,7 @@ Seq2SeqCriterion::Seq2SeqCriterion(
     int pctTeacherForcing /* = 100 */,
     double labelSmooth /* = 0.0 */,
     bool inputFeeding /* = false */,
-    std::string samplingStrategy, /* = w2l::kRandSampling */
+    std::string samplingStrategy, /* = fl::task::asr::kRandSampling */
     double gumbelTemperature /* = 1.0 */,
     int nRnnLayer /* = 1 */,
     int nAttnRound /* = 1 */,
@@ -249,10 +259,10 @@ std::pair<Variable, Variable> Seq2SeqCriterion::vectorizedDecoder(
     // Slice off eos
     auto y = target(af::seq(0, U - 2), af::span);
     if (train_) {
-      if (samplingStrategy_ == w2l::kModelSampling) {
+      if (samplingStrategy_ == fl::task::asr::kModelSampling) {
         throw std::logic_error(
             "vectorizedDecoder does not support model sampling");
-      } else if (samplingStrategy_ == w2l::kRandSampling) {
+      } else if (samplingStrategy_ == fl::task::asr::kRandSampling) {
         auto mask =
             Variable(af::randu(y.dims()) * 100 <= pctTeacherForcing_, false);
         auto samples =
@@ -307,7 +317,7 @@ std::pair<Variable, Variable> Seq2SeqCriterion::decoder(
 
     if (!train_) {
       y = target(u, af::span);
-    } else if (samplingStrategy_ == w2l::kGumbelSampling) {
+    } else if (samplingStrategy_ == fl::task::asr::kGumbelSampling) {
       double eps = 1e-7;
       auto gb = -log(-log((1 - 2 * eps) * af::randu(ox.dims()) + eps));
       ox = logSoftmax((ox + Variable(gb, false)) / gumbelTemperature_, 0);
@@ -315,11 +325,11 @@ std::pair<Variable, Variable> Seq2SeqCriterion::decoder(
     } else if (af::allTrue<bool>(
                    af::randu(1) * 100 <= af::constant(pctTeacherForcing_, 1))) {
       y = target(u, af::span);
-    } else if (samplingStrategy_ == w2l::kModelSampling) {
+    } else if (samplingStrategy_ == fl::task::asr::kModelSampling) {
       af::array maxIdx, maxValues;
       max(maxValues, maxIdx, ox.array());
       y = Variable(maxIdx, false);
-    } else if (samplingStrategy_ == w2l::kRandSampling) {
+    } else if (samplingStrategy_ == fl::task::asr::kRandSampling) {
       y = Variable(
           (af::randu(af::dim4{1, target.dims(1)}) * (nClass_ - 1)).as(s32),
           false);
@@ -435,7 +445,7 @@ std::vector<Seq2SeqCriterion::CandidateHypo> Seq2SeqCriterion::beamSearch(
 
     scoreArr = scoreArr + ox.array(); // C x B
     scoreArr = af::flat(scoreArr); // column-first
-    auto scoreVec = w2l::afToVector<float>(scoreArr);
+    auto scoreVec = afToVector<float>(scoreArr);
 
     std::vector<size_t> indices(scoreVec.size());
     std::iota(indices.begin(), indices.end(), 0);
@@ -497,7 +507,7 @@ std::pair<Variable, Seq2SeqState> Seq2SeqCriterion::decodeStep(
   Variable hy;
   if (y.isempty()) {
     hy = tile(startEmbedding(), {1, 1, static_cast<int>(xEncoded.dims(2))});
-  } else if (train_ && samplingStrategy_ == w2l::kGumbelSampling) {
+  } else if (train_ && samplingStrategy_ == fl::task::asr::kGumbelSampling) {
     hy = linear(y, embedding()->param(0));
   } else {
     hy = embedding()->forward(y);
@@ -600,7 +610,7 @@ Seq2SeqCriterion::decodeBatchStep(
 
     af::array bestpath, maxvalues;
     af::max(maxvalues, bestpath, alphaBatched.array(), 0);
-    std::vector<int> maxIdx = w2l::afToVector<int>(bestpath);
+    std::vector<int> maxIdx = afToVector<int>(bestpath);
     for (int i = 0; i < batchSize; i++) {
       outstates[i]->peakAttnPos = maxIdx[i];
       // TODO: std::abs maybe unnecessary
@@ -617,7 +627,7 @@ Seq2SeqCriterion::decodeBatchStep(
   outBatched = logSoftmax(outBatched / smoothingTemperature, 0);
   std::vector<std::vector<float>> out(batchSize);
   for (int i = 0; i < batchSize; i++) {
-    out[i] = w2l::afToVector<float>(outBatched.col(i));
+    out[i] = afToVector<float>(outBatched.col(i));
   }
 
   return std::make_pair(out, outstates);
@@ -625,8 +635,9 @@ Seq2SeqCriterion::decodeBatchStep(
 
 void Seq2SeqCriterion::setUseSequentialDecoder() {
   useSequentialDecoder_ = false;
-  if ((pctTeacherForcing_ < 100 && samplingStrategy_ == w2l::kModelSampling) ||
-      samplingStrategy_ == w2l::kGumbelSampling || inputFeeding_) {
+  if ((pctTeacherForcing_ < 100 &&
+       samplingStrategy_ == fl::task::asr::kModelSampling) ||
+      samplingStrategy_ == fl::task::asr::kGumbelSampling || inputFeeding_) {
     useSequentialDecoder_ = true;
   } else if (
       std::dynamic_pointer_cast<SimpleLocationAttention>(attention(0)) ||
@@ -707,5 +718,6 @@ AMUpdateFunc buildAmUpdateFunction(
 
   return amUpdateFunc;
 }
-
-} // namespace w2l
+} // namespace asr
+} // namespace task
+} // namespace fl

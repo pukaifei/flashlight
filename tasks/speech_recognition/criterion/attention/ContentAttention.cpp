@@ -11,7 +11,9 @@
 
 using namespace fl;
 
-namespace w2l {
+namespace fl {
+namespace task {
+namespace asr {
 
 std::pair<Variable, Variable> ContentAttention::forward(
     const Variable& state,
@@ -92,5 +94,6 @@ std::pair<Variable, Variable> NeuralContentAttention::forward(
 std::string NeuralContentAttention::prettyString() const {
   return "NeuralContentBasedAttention";
 }
-
-} // namespace w2l
+} // namespace asr
+} // namespace task
+} // namespace fl

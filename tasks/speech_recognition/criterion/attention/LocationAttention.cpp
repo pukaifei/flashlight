@@ -10,7 +10,9 @@
 
 using namespace fl;
 
-namespace w2l {
+namespace fl {
+namespace task {
+namespace asr {
 
 SimpleLocationAttention::SimpleLocationAttention(int convKernel) {
   Sequential pa;
@@ -170,5 +172,6 @@ std::pair<Variable, Variable> NeuralLocationAttention::forward(
 std::string NeuralLocationAttention::prettyString() const {
   return "NeuralLocationBasedAttention";
 }
-
-} // namespace w2l
+} // namespace asr
+} // namespace task
+} // namespace fl

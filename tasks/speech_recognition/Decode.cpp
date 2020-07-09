@@ -19,23 +19,24 @@
 #include <glog/logging.h>
 
 #include "common/Defines.h"
-#include "common/FlashlightUtils.h"
-#include "common/Transforms.h"
 #include "criterion/criterion.h"
-#include "data/Featurize.h"
-#include "libraries/common/Dictionary.h"
-#include "libraries/common/ProducerConsumerQueue.h"
-#include "libraries/decoder/LexiconDecoder.h"
-#include "libraries/decoder/LexiconFreeDecoder.h"
-#include "libraries/decoder/LexiconFreeSeq2SeqDecoder.h"
-#include "libraries/decoder/LexiconSeq2SeqDecoder.h"
-#include "libraries/lm/ConvLM.h"
-#include "libraries/lm/KenLM.h"
-#include "libraries/lm/ZeroLM.h"
-#include "module/module.h"
+#include "decoder/ConvLmModule.h"
+#include "decoder/Defines.h"
+#include "decoder/Utils.h"
 #include "runtime/runtime.h"
 
-using namespace w2l;
+#include "libraries/common/ProducerConsumerQueue.h"
+#include "libraries/language/decoder/LexiconDecoder.h"
+#include "libraries/language/decoder/LexiconFreeDecoder.h"
+#include "libraries/language/decoder/LexiconFreeSeq2SeqDecoder.h"
+#include "libraries/language/decoder/LexiconSeq2SeqDecoder.h"
+#include "libraries/language/decoder/lm/ConvLM.h"
+#include "libraries/language/decoder/lm/KenLM.h"
+#include "libraries/language/decoder/lm/ZeroLM.h"
+
+using namespace fl::ext;
+using namespace fl::lib;
+using namespace fl::task::asr;
 
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
@@ -74,7 +75,7 @@ int main(int argc, char** argv) {
   if (!FLAGS_am.empty()) {
     LOG(INFO) << "[Network] Reading acoustic model from " << FLAGS_am;
     af::setDevice(0);
-    W2lSerializer::load(FLAGS_am, cfg, network, criterion);
+    Serializer::load(FLAGS_am, cfg, network, criterion);
     network->eval();
     LOG(INFO) << "[Network] " << network->prettyString();
     if (criterion) {
@@ -101,7 +102,7 @@ int main(int argc, char** argv) {
 
   // Only Copy any values from deprecated flags to new flags when deprecated
   // flags are present and corresponding new flags aren't
-  w2l::handleDeprecatedFlags();
+  handleDeprecatedFlags();
 
   LOG(INFO) << "Gflags after parsing \n" << serializeGflags("; ");
 
@@ -230,7 +231,7 @@ int main(int argc, char** argv) {
       af::setDevice(0);
       LOG(INFO) << "[ConvLM]: Loading LM from " << FLAGS_lm;
       std::shared_ptr<fl::Module> convLmModel;
-      W2lSerializer::load(FLAGS_lm, convLmModel);
+      Serializer::load(FLAGS_lm, convLmModel);
       convLmModel->eval();
 
       auto getConvLmScoreFunc = buildGetConvLmScoreFunction(convLmModel);
@@ -322,7 +323,7 @@ int main(int argc, char** argv) {
     std::shared_ptr<SequenceCriterion> localCriterion = criterion;
     if (tid != 0) {
       std::unordered_map<std::string, std::string> dummyCfg;
-      W2lSerializer::load(FLAGS_am, dummyCfg, localNetwork, localCriterion);
+      Serializer::load(FLAGS_am, dummyCfg, localNetwork, localCriterion);
       localNetwork->eval();
       localCriterion->eval();
     }
@@ -343,8 +344,8 @@ int main(int argc, char** argv) {
       TargetUnit targetUnit;
       auto tokenTarget = afToVector<int>(sample[kTargetIdx]);
       auto wordTarget = afToVector<int>(sample[kWordIdx]);
-      // TODO: we will reform the w2l dataset so that the loaded word targets
-      // are strings already
+      // TODO: we will reform the dataset so that the loaded word
+      // targets are strings already
       std::vector<std::string> wordTargetStr;
       if (FLAGS_uselexicon) {
         wordTargetStr = wrdIdx2Wrd(wordTarget, wordDict);
@@ -371,7 +372,7 @@ int main(int argc, char** argv) {
         std::string emissionDir =
             pathsConcat(FLAGS_emission_dir, cleanTestPath);
         std::string savePath = pathsConcat(emissionDir, sampleId + ".bin");
-        W2lSerializer::load(savePath, emissionUnit);
+        Serializer::load(savePath, emissionUnit);
       }
 
       emissionQueue.add({emissionUnit, targetUnit});
@@ -381,8 +382,8 @@ int main(int argc, char** argv) {
     }
 
     localNetwork.reset(); // AM is only used in running forward pass. So we will
-                          // free the space of it on GPU or memory.
-                          // localNetwork.use_count() will be 0 after this call.
+    // free the space of it on GPU or memory.
+    // localNetwork.use_count() will be 0 after this call.
 
     af::deviceGC(); // Explicitly call the Garbage collector.
   };
@@ -412,8 +413,10 @@ int main(int argc, char** argv) {
                      &sliceTime](int tid) {
     try {
       /* 1. Prepare GPU-dependent resources */
-      // Note: These 2 GPU-dependent models should be placed on different cards
-      // for different threads and nthread_decoder should not be greater than
+      // Note: These 2 GPU-dependent models should be placed on different
+      // cards
+      // for different threads and nthread_decoder should not be greater
+      // than
       // the number of GPUs.
       std::shared_ptr<SequenceCriterion> localCriterion = criterion;
       std::shared_ptr<LM> localLm = lm;
@@ -430,7 +433,7 @@ int main(int argc, char** argv) {
         if (FLAGS_lmtype == "convlm") {
           LOG(INFO) << "[ConvLM]: Loading LM from " << FLAGS_lm;
           std::shared_ptr<fl::Module> convLmModel;
-          W2lSerializer::load(FLAGS_lm, convLmModel);
+          Serializer::load(FLAGS_lm, convLmModel);
           convLmModel->eval();
 
           auto getConvLmScoreFunc = buildGetConvLmScoreFunction(convLmModel);
@@ -445,7 +448,7 @@ int main(int argc, char** argv) {
         if (criterionType == CriterionType::S2S) {
           std::shared_ptr<fl::Module> dummyNetwork;
           std::unordered_map<std::string, std::string> dummyCfg;
-          W2lSerializer::load(FLAGS_am, dummyCfg, dummyNetwork, localCriterion);
+          Serializer::load(FLAGS_am, dummyCfg, dummyNetwork, localCriterion);
           localCriterion->eval();
         }
       }

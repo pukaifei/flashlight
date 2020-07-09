@@ -11,12 +11,14 @@
 #include <flashlight/common/cuda.h>
 
 #include "criterion/CriterionUtils.h"
-#include "libraries/criterion/cuda/FullConnectionCriterion.cuh"
+#include "libraries/audio/criterion/cuda/FullConnectionCriterion.cuh"
 
 using fl::Variable;
-using FCC = w2l::cuda::FullConnectionCriterion<float>;
+using FCC = fl::lib::cuda::FullConnectionCriterion<float>;
 
-namespace w2l {
+namespace fl {
+namespace task {
+namespace asr {
 
 static void backward(
     std::vector<Variable>& inputs,
@@ -106,5 +108,6 @@ Variable FullConnectionCriterion::forward(
         backward(inputs, gradVar, B, T, N, trans, workspace);
       });
 }
-
-} // namespace w2l
+} // namespace asr
+} // namespace task
+} // namespace fl

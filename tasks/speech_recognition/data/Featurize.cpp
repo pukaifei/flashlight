@@ -15,15 +15,55 @@
 #include <glog/logging.h>
 
 #include "common/Defines.h"
-#include "common/FlashlightUtils.h"
-#include "common/Transforms.h"
-#include "libraries/feature/Mfcc.h"
-#include "libraries/feature/Mfsc.h"
-#include "libraries/feature/PowerSpectrum.h"
+#include "libraries/audio/feature/Mfcc.h"
+#include "libraries/audio/feature/Mfsc.h"
+#include "libraries/common/String.h"
 
-namespace w2l {
+using namespace fl::lib;
 
-namespace {
+namespace fl {
+namespace task {
+namespace asr {
+
+FeatureParams defineSpeechFeatureParams() {
+  FeatureParams params;
+
+  // PowerSpectrum, Mfsc, Mfcc
+  params.samplingFreq = FLAGS_samplerate;
+  params.frameSizeMs = FLAGS_framesizems;
+  params.frameStrideMs = FLAGS_framestridems;
+  params.lowFreqFilterbank = 0;
+  params.highFreqFilterbank = FLAGS_samplerate / 2;
+  params.zeroMeanFrame = false;
+  params.ditherVal = 0.0;
+
+  // Mfsc, Mfcc
+  params.numFilterbankChans = FLAGS_filterbanks;
+  params.useEnergy = false;
+  params.usePower = false;
+  params.accWindow = FLAGS_devwin;
+  params.deltaWindow = FLAGS_devwin;
+
+  //  Mfcc
+  params.numCepstralCoeffs = FLAGS_mfcccoeffs;
+  params.lifterParam = kLifterParam;
+  params.melFloor = FLAGS_melfloor;
+
+  return params;
+}
+
+int64_t getSpeechFeatureSize() {
+  int64_t numFeatures = FLAGS_channels;
+  auto featparams = defineSpeechFeatureParams();
+  if (FLAGS_pow) {
+    numFeatures = featparams.powSpecFeatSz();
+  } else if (FLAGS_mfsc) {
+    numFeatures = featparams.mfscFeatSz();
+  } else if (FLAGS_mfcc) {
+    numFeatures = featparams.mfccFeatSz();
+  }
+  return numFeatures;
+}
 
 Mfcc& getMfcc() {
   static Mfcc mfcc(defineSpeechFeatureParams());
@@ -40,16 +80,14 @@ PowerSpectrum& getPowerSpectrum() {
   return powspec;
 }
 
-} // namespace
-
-W2lFeatureData featurize(
-    const std::vector<W2lLoaderData>& data,
+FeatureData featurize(
+    const std::vector<LoaderData>& data,
     const DictionaryMap& dicts) {
   if (data.empty()) {
     return {};
   }
   auto batchSz = data.size();
-  W2lFeatureData feat;
+  FeatureData feat;
   std::vector<std::string> sampleIds;
 
   // Featurize Input
@@ -140,7 +178,7 @@ W2lFeatureData featurize(
           tgtVec = packReplabels(tgtVec, dict, FLAGS_replabel);
         }
         if (FLAGS_criterion == kAsgCriterion) {
-          uniq(tgtVec);
+          dedup(tgtVec);
         }
         if (FLAGS_eostoken) {
           tgtVec.emplace_back(dict.getIndex(kEosToken));
@@ -207,45 +245,6 @@ W2lFeatureData featurize(
 
   return feat;
 }
-
-FeatureParams defineSpeechFeatureParams() {
-  FeatureParams params;
-
-  // PowerSpectrum, Mfsc, Mfcc
-  params.samplingFreq = FLAGS_samplerate;
-  params.frameSizeMs = FLAGS_framesizems;
-  params.frameStrideMs = FLAGS_framestridems;
-  params.lowFreqFilterbank = 0;
-  params.highFreqFilterbank = FLAGS_samplerate / 2;
-  params.zeroMeanFrame = false;
-  params.ditherVal = 0.0;
-
-  // Mfsc, Mfcc
-  params.numFilterbankChans = FLAGS_filterbanks;
-  params.useEnergy = false;
-  params.usePower = false;
-  params.accWindow = FLAGS_devwin;
-  params.deltaWindow = FLAGS_devwin;
-
-  //  Mfcc
-  params.numCepstralCoeffs = FLAGS_mfcccoeffs;
-  params.lifterParam = kLifterParam;
-  params.melFloor = FLAGS_melfloor;
-
-  return params;
-}
-
-int64_t getSpeechFeatureSize() {
-  int64_t numFeatures = FLAGS_channels;
-  auto featparams = defineSpeechFeatureParams();
-  if (FLAGS_pow) {
-    numFeatures = featparams.powSpecFeatSz();
-  } else if (FLAGS_mfsc) {
-    numFeatures = featparams.mfscFeatSz();
-  } else if (FLAGS_mfcc) {
-    numFeatures = featparams.mfccFeatSz();
-  }
-  return numFeatures;
-}
-
-} // namespace w2l
+} // namespace asr
+} // namespace task
+} // namespace fl

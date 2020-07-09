@@ -10,7 +10,9 @@
 
 #include "criterion/attention/WindowBase.h"
 
-namespace w2l {
+namespace fl {
+namespace task {
+namespace asr {
 
 class SoftWindow : public WindowBase {
  public:
@@ -35,7 +37,8 @@ class SoftWindow : public WindowBase {
 
   FL_SAVE_LOAD_WITH_BASE(WindowBase, std_, avgRate_, offset_)
 };
+} // namespace asr
+} // namespace task
+} // namespace fl
 
-} // namespace w2l
-
-CEREAL_REGISTER_TYPE(w2l::SoftWindow)
+CEREAL_REGISTER_TYPE(fl::task::asr::SoftWindow)

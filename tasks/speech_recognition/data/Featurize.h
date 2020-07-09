@@ -11,16 +11,19 @@
 #include <arrayfire.h>
 #include <unordered_map>
 
-#include "data/Sound.h"
-#include "libraries/common/Dictionary.h"
-#include "libraries/feature/FeatureParams.h"
+#include "FeatureTransforms.h"
+#include "Sound.h"
 
-namespace w2l {
+#include "libraries/language/dictionary/Dictionary.h"
+
+namespace fl {
+namespace task {
+namespace asr {
 
 typedef std::unordered_map<int, af::dim4> DimsMap;
 typedef std::unordered_map<int, std::vector<int>> TargetFeatMap;
 
-struct W2lFeatureData {
+struct FeatureData {
   std::vector<float> input;
   TargetFeatMap targets;
   af::dim4 inputDims;
@@ -30,18 +33,19 @@ struct W2lFeatureData {
 };
 
 typedef std::unordered_map<int, std::vector<std::string>> TargetMap;
-struct W2lLoaderData {
+struct LoaderData {
   std::vector<float> input;
   TargetMap targets;
   std::string sampleId;
 };
 
-W2lFeatureData featurize(
-    const std::vector<W2lLoaderData>& data,
-    const DictionaryMap& dicts);
+FeatureData featurize(
+    const std::vector<LoaderData>& data,
+    const lib::DictionaryMap& dicts);
 
-FeatureParams defineSpeechFeatureParams();
+lib::FeatureParams defineSpeechFeatureParams();
 
 int64_t getSpeechFeatureSize();
-
-} // namespace w2l
+} // namespace asr
+} // namespace task
+} // namespace fl

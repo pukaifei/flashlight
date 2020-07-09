@@ -12,7 +12,9 @@
 #include <istream>
 #include <vector>
 
-namespace w2l {
+namespace fl {
+namespace task {
+namespace asr {
 
 enum class SoundFormat {
   WAV, // Microsoft WAV format (little endian)
@@ -99,5 +101,6 @@ void saveSound(
     int64_t channels,
     const SoundFormat format,
     const SoundSubFormat subformat);
-
-} // namespace w2l
+} // namespace asr
+} // namespace task
+} // namespace fl

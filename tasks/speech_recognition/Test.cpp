@@ -18,14 +18,19 @@
 #include <glog/logging.h>
 
 #include "common/Defines.h"
-#include "common/FlashlightUtils.h"
-#include "common/Transforms.h"
 #include "criterion/criterion.h"
-#include "libraries/common/Dictionary.h"
-#include "module/module.h"
+#include "decoder/Defines.h"
+#include "decoder/Utils.h"
 #include "runtime/runtime.h"
 
-using namespace w2l;
+#include "extensions/common/Utils.h"
+#include "libraries/common/System.h"
+#include "libraries/language/dictionary/Dictionary.h"
+#include "libraries/language/dictionary/Utils.h"
+
+using namespace fl::ext;
+using namespace fl::lib;
+using namespace fl::task::asr;
 
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
@@ -55,7 +60,7 @@ int main(int argc, char** argv) {
   std::unordered_map<std::string, std::string> cfg;
   LOG(INFO) << "[Network] Reading acoustic model from " << FLAGS_am;
   af::setDevice(0);
-  W2lSerializer::load(FLAGS_am, cfg, network, criterion);
+  Serializer::load(FLAGS_am, cfg, network, criterion);
   network->eval();
   criterion->eval();
 
@@ -78,7 +83,7 @@ int main(int argc, char** argv) {
 
   // Only Copy any values from deprecated flags to new flags when deprecated
   // flags are present and corresponding new flags aren't
-  w2l::handleDeprecatedFlags();
+  handleDeprecatedFlags();
 
   LOG(INFO) << "Gflags after parsing \n" << serializeGflags("; ");
 
@@ -197,7 +202,7 @@ int main(int argc, char** argv) {
     std::shared_ptr<SequenceCriterion> localCriterion = criterion;
     if (tid != 0) {
       std::unordered_map<std::string, std::string> dummyCfg;
-      W2lSerializer::load(FLAGS_am, dummyCfg, localNetwork, localCriterion);
+      Serializer::load(FLAGS_am, dummyCfg, localNetwork, localCriterion);
       localNetwork->eval();
       localCriterion->eval();
     }
@@ -272,7 +277,7 @@ int main(int argc, char** argv) {
 
       if (!emissionDir.empty()) {
         std::string savePath = pathsConcat(emissionDir, sampleId + ".bin");
-        W2lSerializer::save(savePath, emissionUnit);
+        Serializer::save(savePath, emissionUnit);
       }
     }
 

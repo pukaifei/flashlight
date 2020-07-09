@@ -7,10 +7,11 @@
  */
 #include "ConnectionistTemporalClassificationCriterion.h"
 
-#include "common/FlashlightUtils.h"
-#include "libraries/criterion/cpu/ConnectionistTemporalClassificationCriterion.h"
+#include "extensions/common/Utils.h"
+#include "libraries/audio/criterion/cpu/ConnectionistTemporalClassificationCriterion.h"
 
-using CTC = w2l::cpu::ConnectionistTemporalClassificationCriterion<float>;
+using CTC = fl::lib::cpu::ConnectionistTemporalClassificationCriterion<float>;
+using namespace fl::ext;
 
 namespace {
 
@@ -40,11 +41,14 @@ af::array logSoftmax(const af::array& input, const int dim) {
 
 using namespace fl;
 
-namespace w2l {
+namespace fl {
+namespace task {
+namespace asr {
 
 ConnectionistTemporalClassificationCriterion::
     ConnectionistTemporalClassificationCriterion(
-        w2l::CriterionScaleMode scalemode /* = w2l::CriterionScaleMode::NONE */)
+        fl::lib::CriterionScaleMode
+            scalemode /* = fl::lib::CriterionScaleMode::NONE */)
     : scaleMode_(scalemode) {}
 
 af::array ConnectionistTemporalClassificationCriterion::viterbiPath(
@@ -64,7 +68,7 @@ af::array ConnectionistTemporalClassificationCriterion::viterbiPath(
 
   const af::array targetSize = getTargetSizeArray(targetVar, T);
   std::shared_ptr<CTCContext> ctx = std::make_shared<CTCContext>();
-  af::array softmax = logSoftmax(inputVar, 0);
+  af::array softmax = ::logSoftmax(inputVar, 0);
   std::vector<float> inputVec = afToVector<float>(softmax);
   ctx->targetVec = afToVector<int>(targetVar);
   ctx->targetSizeVec = afToVector<int>(targetSize);
@@ -106,5 +110,6 @@ void ConnectionistTemporalClassificationCriterion::validate(
     throw(af::exception("CTC: Batchsize mismatch for input and target"));
   }
 }
-
-} // namespace w2l
+} // namespace asr
+} // namespace task
+} // namespace fl

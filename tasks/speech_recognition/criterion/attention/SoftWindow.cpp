@@ -10,7 +10,9 @@
 
 using namespace fl;
 
-namespace w2l {
+namespace fl {
+namespace task {
+namespace asr {
 
 SoftWindow::SoftWindow() {}
 SoftWindow::SoftWindow(double std, double avgRate, int offset)
@@ -56,5 +58,6 @@ SoftWindow::computeWindowMask(int targetLen, int inputSteps, int batchSize) {
 
   return mask;
 }
-
-} // namespace w2l
+} // namespace asr
+} // namespace task
+} // namespace fl
