@@ -12,3 +12,4 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/semisupervised)
 add_subdirectory(${PROJECT_SOURCE_DIR}/localPriorMatch)
 add_subdirectory(${PROJECT_SOURCE_DIR}/localPriorMatchOss) # prepare for opensource
 add_subdirectory(${PROJECT_SOURCE_DIR}/lmAnalysis)
+add_subdirectory(${PROJECT_SOURCE_DIR}/lead2Gold)
