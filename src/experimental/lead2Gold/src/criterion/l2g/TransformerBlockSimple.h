@@ -30,11 +30,14 @@ class TransformerBlockSimple : public fl::Container {
       float pLayerdrop,
       bool usePosEmb);
 
-  //if input is of size 2. First element is the past and we ask to forward the 2nd element.
-  //if input is of size 1. We compute every possibility.
-  //encoded is a sequence CxTxBx1 on which to attend.
-  std::vector<fl::Variable> forward(const std::vector<fl::Variable>& input, const std::vector<fl::Variable>& encoded);
-  std::vector<fl::Variable> forward(const std::vector<fl::Variable>& input) override;
+  // if input is of size 2. First element is the past and we ask to forward the
+  // 2nd element. if input is of size 1. We compute every possibility. encoded is
+  // a sequence CxTxBx1 on which to attend.
+  std::vector<fl::Variable> forward(
+      const std::vector<fl::Variable>& input,
+      const std::vector<fl::Variable>& encoded);
+  std::vector<fl::Variable> forward(
+      const std::vector<fl::Variable>& input) override;
   std::string prettyString() const override;
 
  private:
@@ -47,8 +50,13 @@ class TransformerBlockSimple : public fl::Container {
   std::shared_ptr<fl::LayerNorm> norm1_, norm2_;
 
   fl::Variable mlp(const fl::Variable& input);
-  fl::Variable selfAttention(const std::vector<fl::Variable>& input, const int32_t offset);
-  fl::Variable Attention(const fl::Variable& input, const std::vector<fl::Variable>& encoded, const int32_t offset);
+  fl::Variable selfAttention(
+      const std::vector<fl::Variable>& input,
+      const int32_t offset);
+  fl::Variable Attention(
+      const fl::Variable& input,
+      const std::vector<fl::Variable>& encoded,
+      const int32_t offset);
 
   FL_SAVE_LOAD_WITH_BASE(
       Container,

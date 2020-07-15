@@ -54,7 +54,7 @@ class DataScheduler {
 
   std::mt19937 gen_;
 
-  //DataScheduler() {}
+  // DataScheduler() {}
 
   void initialize();
 

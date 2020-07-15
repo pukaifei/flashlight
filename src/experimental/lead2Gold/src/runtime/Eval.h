@@ -24,7 +24,6 @@ void evalOutput(
     const Dictionary& tgtDict,
     std::shared_ptr<SequenceCriterion> criterion);
 
-
 void evalDataset(
     std::shared_ptr<fl::Module> ntwrk,
     std::shared_ptr<SequenceCriterion> criterion,

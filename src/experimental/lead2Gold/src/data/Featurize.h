@@ -11,10 +11,10 @@
 #include <arrayfire.h>
 #include <unordered_map>
 
+#include "data/Featurize.h"
 #include "data/Sound.h"
 #include "libraries/common/Dictionary.h"
 #include "libraries/feature/FeatureParams.h"
-#include "data/Featurize.h"
 
 namespace w2l {
 

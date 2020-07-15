@@ -15,17 +15,16 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-#include "experimental/lead2Gold/src/common/Defines.h"
 #include "common/FlashlightUtils.h"
+#include "common/Transforms.h"
+#include "experimental/lead2Gold/src/common/Defines.h"
+#include "experimental/lead2Gold/src/common/Utils.h"
 #include "experimental/lead2Gold/src/criterion/criterion.h"
 #include "experimental/lead2Gold/src/data/Featurize.h"
 #include "experimental/lead2Gold/src/data/Utils.h"
-#include "experimental/lead2Gold/src/common/Utils.h"
 #include "experimental/lead2Gold/src/runtime/runtime.h"
 #include "libraries/common/Dictionary.h"
 #include "module/module.h"
-#include "common/Transforms.h"
-
 
 using namespace w2l;
 
@@ -86,7 +85,8 @@ int main(int argc, char** argv) {
     tokenDict.addEntry(std::to_string(r));
   }
   // ctc expects the blank label last
-  if (FLAGS_criterion == kCtcCriterion || FLAGS_criterion == kCtcBeamNoiseCriterion) {
+  if (FLAGS_criterion == kCtcCriterion ||
+      FLAGS_criterion == kCtcBeamNoiseCriterion) {
     tokenDict.addEntry(kBlankToken);
   }
   // Setup-specific modifications
@@ -111,26 +111,37 @@ int main(int argc, char** argv) {
   }
 
   /* =========== ASG BEAM NOISE SPECIFIC ============ */
-  //to add LM look at wave2word code
+  // to add LM look at wave2word code
   std::shared_ptr<NoiseTrie> noiselex = nullptr;
   std::shared_ptr<NoiseLMLetterSwapUnit> noiselm;
   bool isNoiseModelTrained = false;
   Dictionary noise_keys(dictPath);
-  if(FLAGS_criterion == kAsgBeamNoiseCriterion || FLAGS_criterion == kCtcBeamNoiseCriterion) {
+  if (FLAGS_criterion == kAsgBeamNoiseCriterion ||
+      FLAGS_criterion == kCtcBeamNoiseCriterion) {
     if (FLAGS_uselexicon && !FLAGS_lexicon.empty()) {
-      noiselex = std::shared_ptr<NoiseTrie>(new NoiseTrie(noise_keys.indexSize(), noise_keys.getIndex("|"), nullptr));
+      noiselex = std::shared_ptr<NoiseTrie>(new NoiseTrie(
+          noise_keys.indexSize(), noise_keys.getIndex("|"), nullptr));
       auto words = noiselex->load(FLAGS_lexicon, tokenDict);
     }
-    //create an empty noiselm
+    // create an empty noiselm
     noiselm = std::make_shared<NoiseLMLetterSwapUnit>(
-      "", "identitynoiselm", noise_keys, FLAGS_allowSwap,
-      FLAGS_allowInsertion, FLAGS_allowDeletion,
-      false, FLAGS_scale_noise, FLAGS_scale_sub, FLAGS_scale_ins, FLAGS_scale_del, 0);
+        "",
+        "identitynoiselm",
+        noise_keys,
+        FLAGS_allowSwap,
+        FLAGS_allowInsertion,
+        FLAGS_allowDeletion,
+        false,
+        FLAGS_scale_noise,
+        FLAGS_scale_sub,
+        FLAGS_scale_ins,
+        FLAGS_scale_del,
+        0);
   }
   dicts.insert({kCleanKeyIdx, tokenDict});
   dicts.insert({kNoiseKeyIdx, tokenDict});
-  
-  //Dictionary lmDict = createFairseqTokenDict(FLAGS_lmdict);
+
+  // Dictionary lmDict = createFairseqTokenDict(FLAGS_lmdict);
 
   /* =========== Create Network & Optimizers / Reload Snapshot ============ */
   std::shared_ptr<fl::Module> network;
@@ -150,7 +161,7 @@ int main(int argc, char** argv) {
     auto numFeatures = getSpeechFeatureSize();
 
     network = createW2lSeqModule(archfile, numFeatures, numClasses);
-    
+
     if (FLAGS_criterion == kCtcCriterion) {
       criterion = std::make_shared<CTCLoss>(scalemode);
     } else if (FLAGS_criterion == kAsgCriterion) {
@@ -164,11 +175,33 @@ int main(int argc, char** argv) {
     else if (FLAGS_criterion == kAsgBeamNoiseCriterion) {
       criterion =
           std::make_shared<ASGLoss>(numClasses, scalemode, FLAGS_transdiag);
-      asgbeamnoisecrit = std::make_shared<AutoSegBeamNoiseCriterion>(numClasses, tokenDict, noiselex, *noiselm, FLAGS_beamsize, scalemode, FLAGS_beamthreshold, FLAGS_computeStats, FLAGS_topk, FLAGS_useevalemission, FLAGS_useNoiseToSort);
-    }
-    else if (FLAGS_criterion == kCtcBeamNoiseCriterion) {
+      asgbeamnoisecrit = std::make_shared<AutoSegBeamNoiseCriterion>(
+          numClasses,
+          tokenDict,
+          noiselex,
+          *noiselm,
+          FLAGS_beamsize,
+          scalemode,
+          FLAGS_beamthreshold,
+          FLAGS_computeStats,
+          FLAGS_topk,
+          FLAGS_useevalemission,
+          FLAGS_useNoiseToSort);
+    } else if (FLAGS_criterion == kCtcBeamNoiseCriterion) {
       criterion = std::make_shared<CTCLoss>(scalemode);
-      ctcbeamnoisecrit = std::make_shared<CtcBeamNoiseCriterion>(numClasses, tokenDict, noiselex, *noiselm, FLAGS_beamsize, scalemode, FLAGS_beamthreshold, FLAGS_computeStats, FLAGS_topk, FLAGS_useevalemission, FLAGS_useNoiseToSort, FLAGS_nbNested);
+      ctcbeamnoisecrit = std::make_shared<CtcBeamNoiseCriterion>(
+          numClasses,
+          tokenDict,
+          noiselex,
+          *noiselm,
+          FLAGS_beamsize,
+          scalemode,
+          FLAGS_beamthreshold,
+          FLAGS_computeStats,
+          FLAGS_topk,
+          FLAGS_useevalemission,
+          FLAGS_useNoiseToSort,
+          FLAGS_nbNested);
     }
     /* ================================================ */
 
@@ -184,42 +217,98 @@ int main(int argc, char** argv) {
       LOG(FATAL) << "unimplemented criterion";
     }
 
-    //lmcrit = createLMCritic(lmDict, dict);
+    // lmcrit = createLMCritic(lmDict, dict);
   } else if (runStatus == kForkMode) {
     std::unordered_map<std::string, std::string> cfg; // unused
     /* =========== ASG BEAM NOISE SPECIFIC ============ */
     if (noiselm && wasASGBeamNoise) {
       std::vector<fl::Variable> noiselmparams;
-      //netoptim and critoptim loaded for nothing
-      W2lSerializer::load(reloadPath, cfg, network, criterion, netoptim, critoptim, noiselmparams);
-      for(int64_t i = 0; i < noiselmparams.size(); i++) {
+      // netoptim and critoptim loaded for nothing
+      W2lSerializer::load(
+          reloadPath,
+          cfg,
+          network,
+          criterion,
+          netoptim,
+          critoptim,
+          noiselmparams);
+      for (int64_t i = 0; i < noiselmparams.size(); i++) {
         noiselm->params().at(i).array() = noiselmparams.at(i).array();
       }
       noiselm->paramsToCpu();
       isNoiseModelTrained = true;
-      asgbeamnoisecrit = std::make_shared<AutoSegBeamNoiseCriterion>(numClasses, tokenDict, noiselex, *noiselm, FLAGS_beamsize, scalemode, FLAGS_beamthreshold, FLAGS_computeStats, FLAGS_topk, FLAGS_useevalemission, FLAGS_useNoiseToSort);
-    } else if (noiselm && wasCTCBeamNoise){
+      asgbeamnoisecrit = std::make_shared<AutoSegBeamNoiseCriterion>(
+          numClasses,
+          tokenDict,
+          noiselex,
+          *noiselm,
+          FLAGS_beamsize,
+          scalemode,
+          FLAGS_beamthreshold,
+          FLAGS_computeStats,
+          FLAGS_topk,
+          FLAGS_useevalemission,
+          FLAGS_useNoiseToSort);
+    } else if (noiselm && wasCTCBeamNoise) {
       std::vector<fl::Variable> noiselmparams;
-      //netoptim and critoptim loaded for nothing
-      W2lSerializer::load(reloadPath, cfg, network, criterion, netoptim, critoptim, noiselmparams);
-      for(int64_t i = 0; i < noiselmparams.size(); i++) {
+      // netoptim and critoptim loaded for nothing
+      W2lSerializer::load(
+          reloadPath,
+          cfg,
+          network,
+          criterion,
+          netoptim,
+          critoptim,
+          noiselmparams);
+      for (int64_t i = 0; i < noiselmparams.size(); i++) {
         noiselm->params().at(i).array() = noiselmparams.at(i).array();
       }
       noiselm->paramsToCpu();
       isNoiseModelTrained = true;
-      ctcbeamnoisecrit = std::make_shared<CtcBeamNoiseCriterion>(numClasses, tokenDict, noiselex, *noiselm, FLAGS_beamsize, scalemode, FLAGS_beamthreshold, FLAGS_computeStats, FLAGS_topk, FLAGS_useevalemission, FLAGS_useNoiseToSort);
+      ctcbeamnoisecrit = std::make_shared<CtcBeamNoiseCriterion>(
+          numClasses,
+          tokenDict,
+          noiselex,
+          *noiselm,
+          FLAGS_beamsize,
+          scalemode,
+          FLAGS_beamthreshold,
+          FLAGS_computeStats,
+          FLAGS_topk,
+          FLAGS_useevalemission,
+          FLAGS_useNoiseToSort);
 
     } else {
-
-    if ( FLAGS_criterion == kAsgBeamNoiseCriterion ) {
-      asgbeamnoisecrit = std::make_shared<AutoSegBeamNoiseCriterion>(numClasses, tokenDict, noiselex, *noiselm, FLAGS_beamsize, scalemode, FLAGS_beamthreshold, FLAGS_computeStats, FLAGS_topk, FLAGS_useevalemission, FLAGS_useNoiseToSort);
-    }
-    if ( FLAGS_criterion == kCtcBeamNoiseCriterion ) {
-      ctcbeamnoisecrit = std::make_shared<CtcBeamNoiseCriterion>(numClasses, tokenDict, noiselex, *noiselm, FLAGS_beamsize, scalemode, FLAGS_beamthreshold, FLAGS_computeStats, FLAGS_topk, FLAGS_useevalemission, FLAGS_useNoiseToSort);
-    }
-    /* ================================================ */
-      W2lSerializer::load(
-        reloadPath, cfg, network, criterion);
+      if (FLAGS_criterion == kAsgBeamNoiseCriterion) {
+        asgbeamnoisecrit = std::make_shared<AutoSegBeamNoiseCriterion>(
+            numClasses,
+            tokenDict,
+            noiselex,
+            *noiselm,
+            FLAGS_beamsize,
+            scalemode,
+            FLAGS_beamthreshold,
+            FLAGS_computeStats,
+            FLAGS_topk,
+            FLAGS_useevalemission,
+            FLAGS_useNoiseToSort);
+      }
+      if (FLAGS_criterion == kCtcBeamNoiseCriterion) {
+        ctcbeamnoisecrit = std::make_shared<CtcBeamNoiseCriterion>(
+            numClasses,
+            tokenDict,
+            noiselex,
+            *noiselm,
+            FLAGS_beamsize,
+            scalemode,
+            FLAGS_beamthreshold,
+            FLAGS_computeStats,
+            FLAGS_topk,
+            FLAGS_useevalemission,
+            FLAGS_useNoiseToSort);
+      }
+      /* ================================================ */
+      W2lSerializer::load(reloadPath, cfg, network, criterion);
     }
 
   } else { // kContinueMode
@@ -227,36 +316,70 @@ int main(int argc, char** argv) {
 
     /* =========== ASG BEAM NOISE SPECIFIC ============ */
 
-    if (noiselm){
+    if (noiselm) {
       std::vector<fl::Variable> noiselmparams;
-      W2lSerializer::load(reloadPath, cfg, network, criterion, netoptim, critoptim, noiselmparams, scaleoptim);
-      if (noiselm){
-        for(int64_t i = 0; i < noiselmparams.size(); i++) {
+      W2lSerializer::load(
+          reloadPath,
+          cfg,
+          network,
+          criterion,
+          netoptim,
+          critoptim,
+          noiselmparams,
+          scaleoptim);
+      if (noiselm) {
+        for (int64_t i = 0; i < noiselmparams.size(); i++) {
           noiselm->params().at(i).array() = noiselmparams.at(i).array();
         }
         noiselm->paramsToCpu();
         noiselm->displayNoiseModel();
         isNoiseModelTrained = true;
-
       }
-      scaleoptim = initParamOptimizer({noiselm->params()[0]}, FLAGS_scaleoptim, scaleoptim->getLr() , 0.0, 0.0);
-      if ( FLAGS_criterion == kAsgBeamNoiseCriterion ) {
-        asgbeamnoisecrit = std::make_shared<AutoSegBeamNoiseCriterion>(numClasses, tokenDict, noiselex, *noiselm, FLAGS_beamsize, scalemode, FLAGS_beamthreshold, FLAGS_computeStats, FLAGS_topk, FLAGS_useevalemission, FLAGS_useNoiseToSort);
+      scaleoptim = initParamOptimizer(
+          {noiselm->params()[0]},
+          FLAGS_scaleoptim,
+          scaleoptim->getLr(),
+          0.0,
+          0.0);
+      if (FLAGS_criterion == kAsgBeamNoiseCriterion) {
+        asgbeamnoisecrit = std::make_shared<AutoSegBeamNoiseCriterion>(
+            numClasses,
+            tokenDict,
+            noiselex,
+            *noiselm,
+            FLAGS_beamsize,
+            scalemode,
+            FLAGS_beamthreshold,
+            FLAGS_computeStats,
+            FLAGS_topk,
+            FLAGS_useevalemission,
+            FLAGS_useNoiseToSort);
       }
-      if ( FLAGS_criterion == kCtcBeamNoiseCriterion ) {
-        ctcbeamnoisecrit = std::make_shared<CtcBeamNoiseCriterion>(numClasses, tokenDict, noiselex, *noiselm, FLAGS_beamsize, scalemode, FLAGS_beamthreshold, FLAGS_computeStats, FLAGS_topk, FLAGS_useevalemission, FLAGS_useNoiseToSort);
+      if (FLAGS_criterion == kCtcBeamNoiseCriterion) {
+        ctcbeamnoisecrit = std::make_shared<CtcBeamNoiseCriterion>(
+            numClasses,
+            tokenDict,
+            noiselex,
+            *noiselm,
+            FLAGS_beamsize,
+            scalemode,
+            FLAGS_beamthreshold,
+            FLAGS_computeStats,
+            FLAGS_topk,
+            FLAGS_useevalemission,
+            FLAGS_useNoiseToSort);
       }
-    } else{
-      //std::cout << "load in continue mode" << std::endl;
-      W2lSerializer::load(reloadPath, cfg, network, criterion, netoptim, critoptim);
-      //W2lSerializer::load(reloadPath, cfg, network, criterion);
-      //netoptim = initOptimizer(
-      //  {network}, FLAGS_netoptim, FLAGS_lr, FLAGS_momentum, FLAGS_weightdecay);
-      //critoptim =
+    } else {
+      // std::cout << "load in continue mode" << std::endl;
+      W2lSerializer::load(
+          reloadPath, cfg, network, criterion, netoptim, critoptim);
+      // W2lSerializer::load(reloadPath, cfg, network, criterion);
+      // netoptim = initOptimizer(
+      //  {network}, FLAGS_netoptim, FLAGS_lr, FLAGS_momentum,
+      //  FLAGS_weightdecay);
+      // critoptim =
       //  initOptimizer({criterion}, FLAGS_critoptim, FLAGS_lrcrit, 0.0, 0.0);
-  
     }
-
   }
 
   if (runStatus == kTrainMode || runStatus == kForkMode) {
@@ -264,46 +387,55 @@ int main(int argc, char** argv) {
         {network}, FLAGS_netoptim, FLAGS_lr, FLAGS_momentum, FLAGS_weightdecay);
     critoptim =
         initOptimizer({criterion}, FLAGS_critoptim, FLAGS_lrcrit, 0.0, 0.0);
-  
+
     /* =========== ASG BEAM NOISE SPECIFIC ============ */
-    if (noiselm){
-      scaleoptim = initParamOptimizer({noiselm->params()[0]}, FLAGS_scaleoptim, FLAGS_lrscalenoise, 0.0, 0.0);
+    if (noiselm) {
+      scaleoptim = initParamOptimizer(
+          {noiselm->params()[0]},
+          FLAGS_scaleoptim,
+          FLAGS_lrscalenoise,
+          0.0,
+          0.0);
     }
     /* ================================================ */
   }
 
-  //needed to find a good scale
-  auto falcrit = std::make_shared<ForceAlignmentCriterion>(numClasses, scalemode);
+  // needed to find a good scale
+  auto falcrit =
+      std::make_shared<ForceAlignmentCriterion>(numClasses, scalemode);
   auto ctccrit = std::make_shared<CTCLoss>(scalemode);
 
   LOG_MASTER(INFO) << "[Network] " << network->prettyString();
   LOG_MASTER(INFO) << "[Network Params: " << numTotalParams(network) << "]";
   LOG_MASTER(INFO) << "[Criterion] " << criterion->prettyString();
   LOG_MASTER(INFO) << "[Criterion Params: " << numTotalParams(criterion) << "]";
-  if (noiselm){
+  if (noiselm) {
     LOG_MASTER(INFO) << "[Noiselm] " << noiselm->prettyString();
     LOG_MASTER(INFO) << "[Noiselm Params: " << numTotalParams(noiselm) << "]";
   }
   LOG_MASTER(INFO) << "[Optimizer network] " << netoptim->prettyString();
   LOG_MASTER(INFO) << "[Optimizer criterion] " << critoptim->prettyString();
-  if (noiselm){
+  if (noiselm) {
     LOG_MASTER(INFO) << "[Optimizer scale] " << scaleoptim->prettyString();
   }
   /* ===================== Create Dataset ===================== */
   auto pairedDs = createDatasetNoise(
       FLAGS_train, dicts, lexicon, FLAGS_batchsize, worldRank, worldSize);
 
-
   std::shared_ptr<NoiseW2lListFilesDataset> pairednoiseDs;
-  if (!FLAGS_trainnoise.empty()){
+  if (!FLAGS_trainnoise.empty()) {
     pairednoiseDs = createDatasetNoise(
-        FLAGS_trainnoise, dicts, lexicon, FLAGS_batchsize, worldRank, worldSize);
+        FLAGS_trainnoise,
+        dicts,
+        lexicon,
+        FLAGS_batchsize,
+        worldRank,
+        worldSize);
   }
-
 
   std::shared_ptr<NoiseW2lListFilesDataset> unpairedAudioDs;
   bool noTarget;
-  if (!FLAGS_trainaudio.empty()){
+  if (!FLAGS_trainaudio.empty()) {
     unpairedAudioDs = createDatasetNoise(
         FLAGS_trainaudio,
         dicts,
@@ -311,20 +443,20 @@ int main(int argc, char** argv) {
         FLAGS_audiobatchsize == 0 ? FLAGS_batchsize : FLAGS_audiobatchsize,
         worldRank,
         worldSize);
-    //eraseTargets of the dataset
-    for (int64_t idx=0 ; idx < unpairedAudioDs->size() ; idx++){
+    // eraseTargets of the dataset
+    for (int64_t idx = 0; idx < unpairedAudioDs->size(); idx++) {
       unpairedAudioDs->eraseTargets(idx);
     }
-    noTarget=true;
+    noTarget = true;
   }
 
   if (FLAGS_noresample) {
     LOG_MASTER(INFO) << "Shuffling trainset(s)";
     pairedDs->shuffle(FLAGS_seed);
-    if (!FLAGS_trainaudio.empty()){
+    if (!FLAGS_trainaudio.empty()) {
       unpairedAudioDs->shuffle(FLAGS_seed);
     }
-    if (!FLAGS_trainnoise.empty()){
+    if (!FLAGS_trainnoise.empty()) {
       pairednoiseDs->shuffle(FLAGS_seed);
     }
   }
@@ -344,27 +476,28 @@ int main(int argc, char** argv) {
   }
 
   /* ===================== Training Dataset Scheduler ===================== */
-  if (FLAGS_pairediter == 0){
+  if (FLAGS_pairediter == 0) {
     FLAGS_pairediter = pairedDs->size();
   }
-  if (FLAGS_trainaudio.empty()){
+  if (FLAGS_trainaudio.empty()) {
     FLAGS_audioiter = 0;
-  } else if (FLAGS_audioiter == 0){
-    if (FLAGS_ratioaudio == 0){
+  } else if (FLAGS_audioiter == 0) {
+    if (FLAGS_ratioaudio == 0) {
       FLAGS_audioiter = unpairedAudioDs->size();
-    } else{
-      FLAGS_audioiter = std::min((int)FLAGS_ratioaudio * FLAGS_pairediter, unpairedAudioDs->size());
+    } else {
+      FLAGS_audioiter = std::min(
+          (int)FLAGS_ratioaudio * FLAGS_pairediter, unpairedAudioDs->size());
     }
   }
 
   std::vector<std::shared_ptr<W2lDataset>> param_schedule_ds;
   std::vector<int64_t> param_schedule_datatypes;
   std::vector<int64_t> param_schedule_numiter;
-  if (!FLAGS_trainaudio.empty()){
+  if (!FLAGS_trainaudio.empty()) {
     param_schedule_ds = {pairedDs, unpairedAudioDs};
     param_schedule_datatypes = {kParallelData, kUnpairedAudio};
     param_schedule_numiter = {FLAGS_pairediter, FLAGS_audioiter};
-  } else{
+  } else {
     param_schedule_ds = {pairedDs};
     param_schedule_datatypes = {kParallelData};
     param_schedule_numiter = {FLAGS_pairediter};
@@ -395,41 +528,45 @@ int main(int argc, char** argv) {
   if (reducer) {
     fl::distributeModuleGrads(network, reducer);
     fl::distributeModuleGrads(criterion, reducer);
-    //if (noiselm){
+    // if (noiselm){
     //  fl::distributeModuleGrads(noiselm, reducer);
     //}
   }
 
   fl::allReduceParameters(network);
   fl::allReduceParameters(criterion);
-  //if (noiselm){
+  // if (noiselm){
   //  fl::allReduceParameters(noiselm);
   //}
-  
-  auto updateScaleAsg = [&falcrit,
-                    &criterion,
-                    &asgbeamnoisecrit,
-                    &unpairedAudioDs,
-                    &network,
-                    &noiselm,
-                    &scaleoptim,
-                    &reducer,
-                    &isMaster,
-                    &meters](int nbIter) {
 
+  auto updateScaleAsg = [&falcrit,
+                         &criterion,
+                         &asgbeamnoisecrit,
+                         &unpairedAudioDs,
+                         &network,
+                         &noiselm,
+                         &scaleoptim,
+                         &reducer,
+                         &isMaster,
+                         &meters](int nbIter) {
     auto output_eval = fl::Variable();
     falcrit->setParams(criterion->param(0), 0);
-    //network->eval();
+    // network->eval();
     fl::Variable fal, fal_beam, lossScale;
-    int iterScale=0;
-    while (iterScale < nbIter){
-      for (auto& sample : *unpairedAudioDs){
+    int iterScale = 0;
+    while (iterScale < nbIter) {
+      for (auto& sample : *unpairedAudioDs) {
         iterScale++;
         auto input = fl::input(sample[kInputIdx]);
         auto output = network->forward({input}).front();
 
-        fal_beam = asgbeamnoisecrit->forward(output, output_eval, criterion->param(0), fl::noGrad(sample[kTargetIdx]), fl::noGrad(sample[kNoiseKeyIdx]))[2];
-        //fal_beam = resforward[2];
+        fal_beam = asgbeamnoisecrit->forward(
+            output,
+            output_eval,
+            criterion->param(0),
+            fl::noGrad(sample[kTargetIdx]),
+            fl::noGrad(sample[kNoiseKeyIdx]))[2];
+        // fal_beam = resforward[2];
 
         fal = falcrit->forward(output, fl::noGrad(sample[kTargetIdx]));
         lossScale = fal - fal_beam;
@@ -441,11 +578,12 @@ int main(int argc, char** argv) {
 
         double lossScale_cpu = lossScale.scalar<float>();
         double grad_cpu = lossScale_cpu > 0 ? 1 : (lossScale_cpu < 0 ? -1 : 0);
-        noiselm->params()[0].addGrad(fl::Variable(af::array(1, &grad_cpu), false));
+        noiselm->params()[0].addGrad(
+            fl::Variable(af::array(1, &grad_cpu), false));
         scaleoptim->step();
         scaleoptim->zeroGrad();
         noiselm->scaleToCpu();
-        if (iterScale >= nbIter){
+        if (iterScale >= nbIter) {
           break;
         }
       }
@@ -453,26 +591,26 @@ int main(int argc, char** argv) {
   };
 
   auto updateScaleCtc = [&ctccrit,
-                    &ctcbeamnoisecrit,
-                    &unpairedAudioDs,
-                    &network,
-                    &noiselm,
-                    &scaleoptim,
-                    &reducer,
-                    &isMaster,
-                    &meters](int nbIter) {
-
+                         &ctcbeamnoisecrit,
+                         &unpairedAudioDs,
+                         &network,
+                         &noiselm,
+                         &scaleoptim,
+                         &reducer,
+                         &isMaster,
+                         &meters](int nbIter) {
     auto output_eval = fl::Variable();
-    //network->eval();
+    // network->eval();
     fl::Variable fal, fal_beam, lossScale;
-    int iterScale=0;
-    while (iterScale < nbIter){
-      for (auto& sample : *unpairedAudioDs){
+    int iterScale = 0;
+    while (iterScale < nbIter) {
+      for (auto& sample : *unpairedAudioDs) {
         iterScale++;
         auto input = fl::input(sample[kInputIdx]);
         auto output = network->forward({input}).front();
 
-        fal_beam = ctcbeamnoisecrit->forward(output, output_eval, fl::noGrad(sample[kTargetIdx]))[0];
+        fal_beam = ctcbeamnoisecrit->forward(
+            output, output_eval, fl::noGrad(sample[kTargetIdx]))[0];
         fal = ctccrit->forward({output, fl::noGrad(sample[kTargetIdx])})[0];
         lossScale = fal - fal_beam;
         meters.noiselm.losses[klossScale].add(lossScale.array());
@@ -483,11 +621,12 @@ int main(int argc, char** argv) {
 
         double lossScale_cpu = lossScale.scalar<float>();
         double grad_cpu = lossScale_cpu > 0 ? 1 : (lossScale_cpu < 0 ? -1 : 0);
-        noiselm->params()[0].addGrad(fl::Variable(af::array(1, &grad_cpu), false));
+        noiselm->params()[0].addGrad(
+            fl::Variable(af::array(1, &grad_cpu), false));
         scaleoptim->step();
         scaleoptim->zeroGrad();
         noiselm->scaleToCpu();
-        if (iterScale >= nbIter){
+        if (iterScale >= nbIter) {
           break;
         }
       }
@@ -527,15 +666,15 @@ int main(int argc, char** argv) {
     bool isPairedData;
     network->train();
     criterion->train();
-    //lmcrit->eval();
-    
+    // lmcrit->eval();
+
     double initlr = netoptim->getLr();
     double initcritlr = critoptim->getLr();
-    //double initnoiselmlr;
-    //if (noiselm){
+    // double initnoiselmlr;
+    // if (noiselm){
     //  initnoiselmlr = scaleoptim->getLr();
     //}
-    
+
     std::shared_ptr<SpecAugment> saug;
     if (FLAGS_saug_start_update >= 0) {
       saug = std::make_shared<SpecAugment>(
@@ -548,18 +687,17 @@ int main(int argc, char** argv) {
     }
 
     while (curEpoch < nEpochs) {
-
-      //double lrScale = std::pow(FLAGS_gamma, curEpoch / FLAGS_stepsize);
-      //netoptim->setLr(lrScale * FLAGS_lr);
+      // double lrScale = std::pow(FLAGS_gamma, curEpoch / FLAGS_stepsize);
+      // netoptim->setLr(lrScale * FLAGS_lr);
 
       ++curEpoch;
       if (curEpoch >= FLAGS_lr_decay &&
           (curEpoch - FLAGS_lr_decay) % FLAGS_lr_decay_step == 0) {
         initlr /= 2;
         initcritlr /= 2;
-        //if (noiselm){
-        //initnoiselmlr /= 2;
-        //scaleoptim->setLr(initnoiselmlr);
+        // if (noiselm){
+        // initnoiselmlr /= 2;
+        // scaleoptim->setLr(initnoiselmlr);
         //}
       }
 
@@ -573,25 +711,27 @@ int main(int argc, char** argv) {
       }
 
       af::sync();
-      
+
       meters.timer[kRuntime].resume();
-      
+
       LOG_MASTER(INFO) << "Epoch " << curEpoch << " started!";
 
-      if (unpairedAudioDs){
+      if (unpairedAudioDs) {
         if (!FLAGS_updateOnTheFly &&
-                  ( (curEpoch-1) % FLAGS_updateTranscriptEveryNEpoch == 0)
-                    || noTarget){
+                ((curEpoch - 1) % FLAGS_updateTranscriptEveryNEpoch == 0) ||
+            noTarget) {
           meters.timer[kUpdateTransTimer].resume();
           network->eval();
 
-          for (int64_t idx=0 ; idx < unpairedAudioDs->size() ; idx++){
+          for (int64_t idx = 0; idx < unpairedAudioDs->size(); idx++) {
             auto unp_sample = unpairedAudioDs->get(idx);
-            auto output_eval = network->forward({fl::input(unp_sample[kInputIdx])}).front();
-            auto newTranscriptions = getUpdateTrancriptsWords(output_eval, criterion, dicts);
+            auto output_eval =
+                network->forward({fl::input(unp_sample[kInputIdx])}).front();
+            auto newTranscriptions =
+                getUpdateTrancriptsWords(output_eval, criterion, dicts);
             unpairedAudioDs->updateTargets(idx, newTranscriptions);
           }
-          noTarget=false;
+          noTarget = false;
 
           network->train();
           af::sync();
@@ -599,12 +739,14 @@ int main(int argc, char** argv) {
         }
       }
 
-
-      //Noise model traning loop
-      //We can update the noise model on paired data
+      // Noise model traning loop
+      // We can update the noise model on paired data
       resetNoiselmMeters(meters.noiselm);
       meters.timer[kUpdateNoiseModelTimer].resume();
-      if (noiselm && (FLAGS_identityTest == false) && ((FLAGS_updatedNoiseModelEveryNEpoch != 0 && (curEpoch-1) % FLAGS_updatedNoiseModelEveryNEpoch == 0) || isNoiseModelTrained == false)) {
+      if (noiselm && (FLAGS_identityTest == false) &&
+          ((FLAGS_updatedNoiseModelEveryNEpoch != 0 &&
+            (curEpoch - 1) % FLAGS_updatedNoiseModelEveryNEpoch == 0) ||
+           isNoiseModelTrained == false)) {
         noiselm->trainModel(
             pairednoiseDs,
             network,
@@ -612,46 +754,46 @@ int main(int argc, char** argv) {
             dicts,
             FLAGS_enable_distributed,
             (int)FLAGS_replabel,
-            meters.statsNoise
-        );
+            meters.statsNoise);
         if (isMaster)
           noiselm->displayNoiseModel();
-        if (FLAGS_evalnoiselm){
+        if (FLAGS_evalnoiselm) {
           noiselm->evalModel(
-            network,
-            criterion,
-            (int)FLAGS_replabel,
-            validds["dev-clean"],
-            dicts,
-            meters.noiselm.losses[klossNoiselm]
-          );
+              network,
+              criterion,
+              (int)FLAGS_replabel,
+              validds["dev-clean"],
+              dicts,
+              meters.noiselm.losses[klossNoiselm]);
         }
         isNoiseModelTrained = true;
       }
       meters.timer[kUpdateNoiseModelTimer].stopAndIncUnit();
 
-      
-      if (noiselm && (FLAGS_updateScaleEveryNEpoch != 0 && (curEpoch-1) % FLAGS_updateScaleEveryNEpoch == 0)){
+      if (noiselm &&
+          (FLAGS_updateScaleEveryNEpoch != 0 &&
+           (curEpoch - 1) % FLAGS_updateScaleEveryNEpoch == 0)) {
         meters.timer[kUpdateScaleTimer].resume();
-        if (asgbeamnoisecrit){
-          if (curEpoch-1 == 0){
-            updateScaleAsg(FLAGS_iterscale*5); // initial training has to be longer
-          } else{
+        if (asgbeamnoisecrit) {
+          if (curEpoch - 1 == 0) {
+            updateScaleAsg(
+                FLAGS_iterscale * 5); // initial training has to be longer
+          } else {
             updateScaleAsg(FLAGS_iterscale);
           }
-        } else if (ctcbeamnoisecrit){
-          if (curEpoch-1 == 0){
-            updateScaleCtc(FLAGS_iterscale*5); // initial training has to be longer
-          } else{
+        } else if (ctcbeamnoisecrit) {
+          if (curEpoch - 1 == 0) {
+            updateScaleCtc(
+                FLAGS_iterscale * 5); // initial training has to be longer
+          } else {
             updateScaleCtc(FLAGS_iterscale);
           }
         }
-        meters.timer[kUpdateScaleTimer].stopAndIncUnit();    
+        meters.timer[kUpdateScaleTimer].stopAndIncUnit();
       }
-      
 
       int scheduleIter = 0;
-      //ASR training loop
+      // ASR training loop
       meters.timer[kSampleTimer].resume();
       meters.timer[kTimer].resume();
       while (scheduleIter < nItersPerEpoch) {
@@ -663,8 +805,9 @@ int main(int argc, char** argv) {
         double lrScale = 1;
         if (FLAGS_lrcosine) {
           const double pi = std::acos(-1);
-          lrScale =
-              std::cos(((double)curIter) / ((double)nEpochs*nItersPerEpoch) * pi / 2.0);
+          lrScale = std::cos(
+              ((double)curIter) / ((double)nEpochs * nItersPerEpoch) * pi /
+              2.0);
         } else {
           lrScale =
               std::pow(FLAGS_gamma, (double)curIter / (double)FLAGS_stepsize);
@@ -673,9 +816,8 @@ int main(int argc, char** argv) {
         netoptim->setLr(
             lrScale * initlr * std::min(curIter / double(FLAGS_warmup), 1.0));
         critoptim->setLr(
-            lrScale * initcritlr * std::min(curIter / double(FLAGS_warmup), 1.0));
-
-
+            lrScale * initcritlr *
+            std::min(curIter / double(FLAGS_warmup), 1.0));
 
         af::sync();
 
@@ -691,22 +833,21 @@ int main(int argc, char** argv) {
         }
 
         auto input = fl::input(sample[kInputIdx]);
-        //optionally compute outpute in eval mode to update transcriptions
-        //We have to do it before because .eval() erases gradients.
+        // optionally compute outpute in eval mode to update transcriptions
+        // We have to do it before because .eval() erases gradients.
         fl::Variable output_eval = fl::Variable();
-        //meters.timer[kUpdateTransTimer].resume();
+        // meters.timer[kUpdateTransTimer].resume();
         meters.timer[kFwdTimer].resume();
-        if (!isPairedData && 
-              ( (FLAGS_updateOnTheFly && (curEpoch-1) % FLAGS_updateTranscriptEveryNEpoch == 0) ||
-              af::anyTrue<bool>(sample[kNoiseKeyIdx].isempty()) ||
-              FLAGS_useevalemission
-              )
-            ) {
+        if (!isPairedData &&
+            ((FLAGS_updateOnTheFly &&
+              (curEpoch - 1) % FLAGS_updateTranscriptEveryNEpoch == 0) ||
+             af::anyTrue<bool>(sample[kNoiseKeyIdx].isempty()) ||
+             FLAGS_useevalemission)) {
           network->eval();
           output_eval = network->forward({input}).front();
-          network->train();  
+          network->train();
         }
-        //meters.timer[kUpdateTransTimer].stopAndIncUnit();
+        // meters.timer[kUpdateTransTimer].stopAndIncUnit();
 
         // forward
         if (FLAGS_saug_start_update >= 0 &&
@@ -718,9 +859,10 @@ int main(int argc, char** argv) {
         meters.timer[kFwdTimer].stopAndIncUnit();
         fl::Variable loss;
         if (isPairedData) {
-          //std::cout << "Paired data" << std::endl;
+          // std::cout << "Paired data" << std::endl;
           meters.timer[kCritFwdTimer].resume();
-          loss = criterion->forward({output, fl::noGrad(sample[kTargetIdx])})[0];
+          loss =
+              criterion->forward({output, fl::noGrad(sample[kTargetIdx])})[0];
           af::sync();
           meters.timer[kCritFwdTimer].stopAndIncUnit();
           if (af::anyTrue<bool>(af::isNaN(loss.array()))) {
@@ -728,13 +870,14 @@ int main(int argc, char** argv) {
           }
           meters.train.losses[kASRPaired].add(loss.array());
         } else {
-          //std::cout << "Unpaired data" << std::endl;
+          // std::cout << "Unpaired data" << std::endl;
 
-          //Optionally update the noisy transcription
+          // Optionally update the noisy transcription
           meters.timer[kUpdateTransTimer].resume();
-          if ( (FLAGS_updateOnTheFly && (curEpoch-1) % FLAGS_updateTranscriptEveryNEpoch == 0) ||
-              af::anyTrue<bool>(sample[kNoiseKeyIdx].isempty())){
-            if (output_eval.isempty()){
+          if ((FLAGS_updateOnTheFly &&
+               (curEpoch - 1) % FLAGS_updateTranscriptEveryNEpoch == 0) ||
+              af::anyTrue<bool>(sample[kNoiseKeyIdx].isempty())) {
+            if (output_eval.isempty()) {
               LOG(FATAL) << "Output eval is empty";
             }
             updateTrancripts(sample, output_eval, criterion, dicts);
@@ -744,21 +887,27 @@ int main(int argc, char** argv) {
 
           meters.timer[kCritFwdNoiseTimer].resume();
 
-          if (noiselm){
-            if (asgbeamnoisecrit){
-              loss = asgbeamnoisecrit->forward(output, output_eval, criterion->param(0), fl::noGrad(sample[kTargetIdx]), fl::noGrad(sample[kNoiseKeyIdx]))[0];
-            } else if (ctcbeamnoisecrit){
-              loss = ctcbeamnoisecrit->forward(output, output_eval, fl::noGrad(sample[kTargetIdx]))[0];
+          if (noiselm) {
+            if (asgbeamnoisecrit) {
+              loss = asgbeamnoisecrit->forward(
+                  output,
+                  output_eval,
+                  criterion->param(0),
+                  fl::noGrad(sample[kTargetIdx]),
+                  fl::noGrad(sample[kNoiseKeyIdx]))[0];
+            } else if (ctcbeamnoisecrit) {
+              loss = ctcbeamnoisecrit->forward(
+                  output, output_eval, fl::noGrad(sample[kTargetIdx]))[0];
             }
 
-          } else{
-            loss = criterion->forward({output, fl::noGrad(sample[kTargetIdx])})[0];
+          } else {
+            loss =
+                criterion->forward({output, fl::noGrad(sample[kTargetIdx])})[0];
           }
           af::sync();
           meters.timer[kCritFwdNoiseTimer].stopAndIncUnit();
           meters.train.losses[kASRUnpaired].add(loss.array());
         }
-
 
         // compute training error rate from parallel data
         if (isPairedData) {
@@ -814,21 +963,37 @@ int main(int argc, char** argv) {
             (logOnEpoch && scheduleIter == nItersPerEpoch)) {
           stopTimeMeters(meters);
           runEval(
-              network, criterion, asgbeamnoisecrit, noiselm, FLAGS_replabel, validds, meters, dicts, FLAGS_evalbeamnoise);
+              network,
+              criterion,
+              asgbeamnoisecrit,
+              noiselm,
+              FLAGS_replabel,
+              validds,
+              meters,
+              dicts,
+              FLAGS_evalbeamnoise);
           config[kEpoch] = std::to_string(curEpoch);
           config[kIteration] = std::to_string(curIter);
-          //std::unordered_map<std::string, double> logFields(
+          // std::unordered_map<std::string, double> logFields(
           //    {{"lr", netoptim->getLr()},
           //     {"lmcrit-t", lmTempScale * FLAGS_gumbeltemperature}});
 
           std::unordered_map<std::string, double> logFields(
               {{"lr-net", netoptim->getLr()},
-              {"lr-crit", critoptim->getLr()}}); // add noise model stats
+               {"lr-crit", critoptim->getLr()}}); // add noise model stats
           logFields.insert({"lr-sc", noiselm ? scaleoptim->getLr() : 0});
           logFields.insert({"sc-noise", noiselm ? noiselm->scale_noise() : 0});
 
           logHelper.logAndSaveModel(
-              meters, config, network, criterion, netoptim, critoptim, noiselm, scaleoptim, logFields);
+              meters,
+              config,
+              network,
+              criterion,
+              netoptim,
+              critoptim,
+              noiselm,
+              scaleoptim,
+              logFields);
           resetDatasetMeters(meters.train);
           resetTimeStatMeters(meters);
           network->train();
@@ -838,7 +1003,7 @@ int main(int argc, char** argv) {
           meters.timer[kTimer].resume();
         }
       }
-      af::sync();     
+      af::sync();
     }
 
     startEpoch = curEpoch;
@@ -861,9 +1026,9 @@ int main(int argc, char** argv) {
 
   LOG_MASTER(INFO) << "Finished training";
 
-  //Create a file to indicate that training is finished. 
-  //Slurm will know that no reschedule is needed.
-  if (isMaster){
+  // Create a file to indicate that training is finished.
+  // Slurm will know that no reschedule is needed.
+  if (isMaster) {
     try {
       auto filename = getRunFile("finished", 0, runPath);
       std::ofstream output(filename);

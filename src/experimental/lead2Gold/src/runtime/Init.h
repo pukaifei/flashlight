@@ -18,5 +18,4 @@
 namespace w2l {
 std::unordered_map<std::string, std::string> setFlags(int argc, char** argv);
 
-
 } // namespace w2l

@@ -8,19 +8,19 @@
 
 #include "experimental/lead2Gold/src/runtime/Logger.h"
 
-#include <thread>
 #include <cereal/archives/json.hpp>
 #include <cereal/types/unordered_map.hpp>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <thread>
 
-#include "experimental/lead2Gold/src/common/Defines.h"
 #include "common/FlashlightUtils.h"
+#include "experimental/lead2Gold/src/common/Defines.h"
 #include "runtime/Serial.h"
 
 namespace w2l {
 
-//For Train.cpp
+// For Train.cpp
 std::pair<std::string, std::string> getStatus(
     NoiseTrainMeters& meters,
     int64_t epoch,
@@ -187,10 +187,19 @@ void LogHelper::saveModel(
   try {
     std::string filename =
         getRunFile("model_" + cleanFilepath(tag) + ".bin", runIdx_, runPath_);
-    if (noiselm){
-      W2lSerializer::save(filename, config, network, criterion, netoptim, critoptim, noiselm->params(), scaleoptim);
-    } else{
-      W2lSerializer::save(filename, config, network, criterion, netoptim, critoptim);
+    if (noiselm) {
+      W2lSerializer::save(
+          filename,
+          config,
+          network,
+          criterion,
+          netoptim,
+          critoptim,
+          noiselm->params(),
+          scaleoptim);
+    } else {
+      W2lSerializer::save(
+          filename, config, network, criterion, netoptim, critoptim);
     }
   } catch (const std::exception& ex) {
     LOG(FATAL) << "Error while saving models: " << ex.what();
@@ -207,27 +216,55 @@ void LogHelper::logAndSaveModel(
     std::shared_ptr<NoiseLMLetterSwapUnit> noiselm,
     std::shared_ptr<fl::FirstOrderOptimizer> scaleoptim,
     const std::unordered_map<std::string, double>& logFields) {
-  
-    saveModel("last", config, network, criterion, netoptim, critoptim, noiselm, scaleoptim);
+  saveModel(
+      "last",
+      config,
+      network,
+      criterion,
+      netoptim,
+      critoptim,
+      noiselm,
+      scaleoptim);
 
   int iter = logOnEpoch_ ? std::stoi(config.at(kEpoch))
                          : std::stoi(config.at(kIteration));
 
   if (FLAGS_itersave) {
-    std::string tag = logOnEpoch_ ? format("epoch_%04d", iter) : format("iter_%08d", iter);
-    if (logOnEpoch_ && iter % FLAGS_saveevery == 0){
-      saveModel(tag, config, network, criterion, netoptim, critoptim, noiselm, scaleoptim);
+    std::string tag =
+        logOnEpoch_ ? format("epoch_%04d", iter) : format("iter_%08d", iter);
+    if (logOnEpoch_ && iter % FLAGS_saveevery == 0) {
+      saveModel(
+          tag,
+          config,
+          network,
+          criterion,
+          netoptim,
+          critoptim,
+          noiselm,
+          scaleoptim);
     }
   }
 
-  logStatus(meters, std::stoi(config.at(kEpoch)), std::stoi(config.at(kIteration)), logFields);
+  logStatus(
+      meters,
+      std::stoi(config.at(kEpoch)),
+      std::stoi(config.at(kIteration)),
+      logFields);
 
   for (auto& s : meters.valid) {
     double verr = s.second.edits[kTarget].value()[0];
     auto sit = validminerrs_.find(s.first);
     if (sit == validminerrs_.end() || sit->second > verr) {
       validminerrs_[s.first] = verr;
-      saveModel(s.first, config, network, criterion, netoptim, critoptim, noiselm, scaleoptim);
+      saveModel(
+          s.first,
+          config,
+          network,
+          criterion,
+          netoptim,
+          critoptim,
+          noiselm,
+          scaleoptim);
     }
   }
 }
@@ -262,11 +299,9 @@ std::string LogHelper::formatStatus(
           tag + "-" + m.first + "ER", format("%5.2f", m.second.value()[0]));
     }
   };
-  auto insertNoiselmMeters = [&insertItem](
-                                    NoiselmMeters& meter) {
+  auto insertNoiselmMeters = [&insertItem](NoiselmMeters& meter) {
     for (auto& m : meter.losses) {
-      insertItem(
-           m.first, format("%10.5f", m.second.value()[0]));
+      insertItem(m.first, format("%10.5f", m.second.value()[0]));
     }
   };
 
@@ -278,11 +313,15 @@ std::string LogHelper::formatStatus(
   insertItem("epoch", format("%8d", epoch));
   insertItem("iter", format("%8d", iter));
 
-  insertItem("lr-net", headerOnly ? "" : format("%4.6lf", logFields.at("lr-net")));
-  insertItem("lr-crit", headerOnly ? "" : format("%4.6lf", logFields.at("lr-crit")));
-  insertItem("lr-sc", headerOnly ? "" : format("%4.6lf", logFields.at("lr-sc")));
-  insertItem("sc-noise", headerOnly ? "" : format("%4.6lf", logFields.at("sc-noise")));
-  
+  insertItem(
+      "lr-net", headerOnly ? "" : format("%4.6lf", logFields.at("lr-net")));
+  insertItem(
+      "lr-crit", headerOnly ? "" : format("%4.6lf", logFields.at("lr-crit")));
+  insertItem(
+      "lr-sc", headerOnly ? "" : format("%4.6lf", logFields.at("lr-sc")));
+  insertItem(
+      "sc-noise", headerOnly ? "" : format("%4.6lf", logFields.at("sc-noise")));
+
   int rt = meters.timer[kRuntime].value();
   insertItem(
       kRuntime,
@@ -314,7 +353,10 @@ std::string LogHelper::formatStatus(
   auto isztotal = stats[0];
   auto tsztotal = stats[1];
   auto tszmax = stats[3];
-  insertItem("avg-isz", format("%03d", (isztotal + isztotal_unp) / (numsamples + numsamples_unp)));
+  insertItem(
+      "avg-isz",
+      format(
+          "%03d", (isztotal + isztotal_unp) / (numsamples + numsamples_unp)));
   insertItem("avg-tsz", format("%03d", tsztotal / numsamples));
   insertItem("max-tsz", format("%03d", tszmax));
 
@@ -324,7 +366,7 @@ std::string LogHelper::formatStatus(
   } else {
     audioProcSec /= FLAGS_samplerate;
   }
-  
+
   double audioProcSec_unp = isztotal_unp * FLAGS_batchsize;
   if (FLAGS_pow || FLAGS_mfcc || FLAGS_mfsc) {
     audioProcSec_unp = audioProcSec_unp * FLAGS_framestridems / 1000.0;
@@ -339,22 +381,21 @@ std::string LogHelper::formatStatus(
     audioProcSec_noise /= FLAGS_samplerate;
   }
 
-
   auto worldSize = fl::getWorldSize();
-  double timeTakenSec = meters.timer[kTimer].value() * (numsamples + numsamples_unp) / worldSize;
+  double timeTakenSec =
+      meters.timer[kTimer].value() * (numsamples + numsamples_unp) / worldSize;
 
   insertItem("hrs", format("%7.2f", audioProcSec / 3600.0));
   insertItem("hrs_unp", format("%7.2f", audioProcSec_unp / 3600.0));
   insertItem("hrs_noise", format("%7.2f", audioProcSec_noise / 3600.0));
   insertItem(
       "thrpt(sec/sec)",
-      timeTakenSec > 0.0 ? format("%.2f", (audioProcSec + audioProcSec_unp) / timeTakenSec) : "n/a");
+      timeTakenSec > 0.0
+          ? format("%.2f", (audioProcSec + audioProcSec_unp) / timeTakenSec)
+          : "n/a");
 
   return headerOnly ? header : status;
 }
-
-
-
 
 template <>
 void syncMeter<SSLTrainMeters>(SSLTrainMeters& meters) {
@@ -412,13 +453,13 @@ void resetDatasetMeters(SSLDatasetMeters& meters) {
   }
 }
 
-void resetNoiselmMeters(NoiselmMeters& meters){
+void resetNoiselmMeters(NoiselmMeters& meters) {
   for (auto& m : meters.losses) {
     m.second.reset();
   }
 }
 
-//For Train.cpp
+// For Train.cpp
 template <>
 void syncMeter<NoiseTrainMeters>(NoiseTrainMeters& mtrs) {
   syncMeter(mtrs.stats);

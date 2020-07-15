@@ -8,17 +8,15 @@
 
 #include "experimental/lead2Gold/src/common/Utils.h"
 
+#include <flashlight/flashlight.h>
 #include <cstdlib>
 #include <ctime>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
-#include <flashlight/flashlight.h>
 
-
-#include "experimental/lead2Gold/src/common/Defines.h"
 #include "common/Transforms.h"
-
+#include "experimental/lead2Gold/src/common/Defines.h"
 
 namespace w2l {
 
@@ -29,11 +27,13 @@ std::vector<std::string> NoisetknPrediction2Ltr(
     return std::vector<std::string>{};
   }
 
-  if (FLAGS_criterion == kCtcCriterion || FLAGS_criterion == kAsgCriterion
-    || FLAGS_criterion == kAsgBeamNoiseCriterion || FLAGS_criterion == kCtcBeamNoiseCriterion) {
+  if (FLAGS_criterion == kCtcCriterion || FLAGS_criterion == kAsgCriterion ||
+      FLAGS_criterion == kAsgBeamNoiseCriterion ||
+      FLAGS_criterion == kCtcBeamNoiseCriterion) {
     uniq(tokens);
   }
-  if (FLAGS_criterion == kCtcCriterion || FLAGS_criterion == kCtcBeamNoiseCriterion) {
+  if (FLAGS_criterion == kCtcCriterion ||
+      FLAGS_criterion == kCtcBeamNoiseCriterion) {
     int blankIdx = tokenDict.getIndex(kBlankToken);
     tokens.erase(
         std::remove(tokens.begin(), tokens.end(), blankIdx), tokens.end());
@@ -44,14 +44,14 @@ std::vector<std::string> NoisetknPrediction2Ltr(
   return tknIdx2Ltr(tokens, tokenDict);
 }
 
-//void eraseTargets(std::shared_ptr<NoiseW2lListFilesDataset> ds_){
+// void eraseTargets(std::shared_ptr<NoiseW2lListFilesDataset> ds_){
 //  for (int64_t idx=0 ; idx < ds_->size() ; idx++){
 //    ds_->eraseTargets(idx);
 //  }
-  //for (auto& sample : *ds_) {
-  //  sample[kTargetIdx] = af::array();
-  // sample[kNoiseKeyIdx] = af::array();
-  //}
+// for (auto& sample : *ds_) {
+//  sample[kTargetIdx] = af::array();
+// sample[kNoiseKeyIdx] = af::array();
+//}
 //}
 
 } // namespace w2l

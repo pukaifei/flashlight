@@ -17,14 +17,15 @@
 #include <vector>
 
 #include "common/Defines.h"
-#include "libraries/common/Utils.h"
-#include "libraries/common/WordUtils.h"
 #include "common/Utils.h"
 #include "experimental/lead2Gold/src/data/NoiseW2lListFilesDataset.h"
-
+#include "libraries/common/Utils.h"
+#include "libraries/common/WordUtils.h"
 
 namespace w2l {
-std::vector<std::string> NoisetknPrediction2Ltr(std::vector<int>, const Dictionary&);
-//void eraseTargets(std::shared_ptr<NoiseW2lListFilesDataset> ds_);
+std::vector<std::string> NoisetknPrediction2Ltr(
+    std::vector<int>,
+    const Dictionary&);
+// void eraseTargets(std::shared_ptr<NoiseW2lListFilesDataset> ds_);
 
 } // namespace w2l

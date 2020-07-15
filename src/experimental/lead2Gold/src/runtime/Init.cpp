@@ -108,5 +108,4 @@ std::unordered_map<std::string, std::string> setFlags(int argc, char** argv) {
   return config;
 }
 
-
 } // namespace w2l

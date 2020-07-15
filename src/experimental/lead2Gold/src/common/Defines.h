@@ -20,18 +20,19 @@ namespace w2l {
 // Dataset indices
 // If a new field is added, `kNumDataIdx` should be modified accordingly.
 
-constexpr size_t kNoiseKeyIdx = 4; //Same as kTargetIdx but with replabels removed
+constexpr size_t kNoiseKeyIdx =
+    4; // Same as kTargetIdx but with replabels removed
 constexpr size_t kCleanKeyIdx = 5;
 constexpr size_t kNoisyNoiselmKeyIdx = 6;
 constexpr size_t kCleanNoiselmKeyIdx = 7;
-//constexpr size_t kNumDataIdx = 6; // total number of dataset indices
+// constexpr size_t kNumDataIdx = 6; // total number of dataset indices
 
 // Various constants used in w2l
 constexpr const char* kAsgBeamNoiseCriterion = "asgbeamnoise";
 constexpr const char* kCtcBeamNoiseCriterion = "ctcbeamnoise";
 constexpr const char* kAsgBeamNoiseAnalysis = "asgbeamnoise_analysis";
 
-//constexpr int kMaxDevicePerNode = 2;
+// constexpr int kMaxDevicePerNode = 2;
 //
 // config
 constexpr const char* kIteration = "iteration";
@@ -39,7 +40,7 @@ constexpr const char* kReloadPath = "reloadPath";
 constexpr const char* kRunStatus = "runStatus";
 constexpr const char* kStartEpoch = "startEpoch";
 constexpr const char* kStartIter = "startIter";
-//constexpr const char* kForkAMMode = "forkam";
+// constexpr const char* kForkAMMode = "forkam";
 
 // meter
 constexpr const char* kTarget = "L";
@@ -57,8 +58,7 @@ constexpr const char* kCritFwdNoiseTimer = "crit-noise-fwd";
 constexpr const char* kUpdateTransTimer = "upd-trans";
 constexpr const char* kUpdateScaleTimer = "upd-sc";
 constexpr const char* kUpdateNoiseModelTimer = "upd-noiselm";
-//constexpr const char* kUpdates = "updates";
-
+// constexpr const char* kUpdates = "updates";
 
 constexpr const char* kBwdTimer = "bwd";
 constexpr const char* kOptimTimer = "optim";
@@ -72,8 +72,6 @@ constexpr size_t kUnpairedAudio = 2;
 constexpr const char* kRandomOrder = "random";
 constexpr const char* kInOrder = "inorder";
 constexpr const char* kUniformOrder = "uniform";
-
-
 
 /* ========== ASG BEAM NOISE OPTIONS ========== */
 
@@ -113,17 +111,16 @@ DECLARE_int64(nb_ex);
 DECLARE_int64(nbNested);
 DECLARE_bool(identityTest);
 
-
 /* ========== OPTIMIZER OPTIONS ========== */
 DECLARE_string(scaleoptim);
 DECLARE_int64(iterscale);
 
 /* ========== LEARNING HYPER-PARAMETER OPTIONS ========== */
 DECLARE_int64(saveevery);
-//DECLARE_int64(warmup);
-//DECLARE_bool(use_saug);
-//DECLARE_int64(lr_decay);
-//DECLARE_int64(lr_decay_step);
+// DECLARE_int64(warmup);
+// DECLARE_bool(use_saug);
+// DECLARE_int64(lr_decay);
+// DECLARE_int64(lr_decay_step);
 
 /* ========== DATA SCHEDULER SEMI-SUPERVISED ========== */
 DECLARE_string(trainaudio);
@@ -148,12 +145,8 @@ DECLARE_bool(usePosEmbEveryLayer);
 DECLARE_int64(XFromLayerN);
 DECLARE_double(UseCopy);
 
-
-
-
 /* ========== RNN noiselm ========== */
 DECLARE_int64(encoderrnnlayer);
 DECLARE_double(encoderdropout);
-
 
 } // namespace w2l

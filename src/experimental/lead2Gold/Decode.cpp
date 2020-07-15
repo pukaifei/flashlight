@@ -18,9 +18,9 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-#include "experimental/lead2Gold/src/common/Defines.h"
 #include "common/FlashlightUtils.h"
 #include "common/Transforms.h"
+#include "experimental/lead2Gold/src/common/Defines.h"
 #include "experimental/lead2Gold/src/criterion/criterion.h"
 #include "experimental/lead2Gold/src/data/Featurize.h"
 #include "libraries/common/Dictionary.h"

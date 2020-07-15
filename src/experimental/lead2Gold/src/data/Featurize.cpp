@@ -14,9 +14,9 @@
 
 #include <glog/logging.h>
 
-#include "experimental/lead2Gold/src/common/Defines.h"
 #include "common/FlashlightUtils.h"
 #include "common/Transforms.h"
+#include "experimental/lead2Gold/src/common/Defines.h"
 #include "libraries/feature/Mfcc.h"
 #include "libraries/feature/Mfsc.h"
 #include "libraries/feature/PowerSpectrum.h"
@@ -126,7 +126,8 @@ W2lFeatureData featurize2(
       }
       auto target = d.targets.find(targetType)->second;
 
-      if (targetType == kTargetIdx || targetType == kCleanKeyIdx || targetType == kNoiseKeyIdx) {
+      if (targetType == kTargetIdx || targetType == kCleanKeyIdx ||
+          targetType == kNoiseKeyIdx) {
         auto tgtVec = dict.mapEntriesToIndices(target);
         if (!FLAGS_surround.empty()) {
           auto idx = dict.getIndex(FLAGS_surround);
@@ -139,11 +140,13 @@ W2lFeatureData featurize2(
         if (FLAGS_replabel > 0) {
           tgtVec = packReplabels(tgtVec, dict, FLAGS_replabel);
         }
-        if (FLAGS_criterion == kAsgCriterion || FLAGS_criterion == kAsgBeamNoiseCriterion
-         || FLAGS_criterion == kAsgBeamNoiseAnalysis) {
+        if (FLAGS_criterion == kAsgCriterion ||
+            FLAGS_criterion == kAsgBeamNoiseCriterion ||
+            FLAGS_criterion == kAsgBeamNoiseAnalysis) {
           uniq(tgtVec);
         }
-        if (FLAGS_replabel > 0 && (targetType == kNoiseKeyIdx || targetType == kCleanKeyIdx)) {
+        if (FLAGS_replabel > 0 &&
+            (targetType == kNoiseKeyIdx || targetType == kCleanKeyIdx)) {
           tgtVec = unpackReplabels(tgtVec, dict, FLAGS_replabel);
         }
 
@@ -167,8 +170,9 @@ W2lFeatureData featurize2(
         // L X BATCHSZ (Col Major)
         feat.targets[targetType].resize(batchSz * maxTgtSize, padVal);
         feat.targetDims[targetType] = af::dim4(maxTgtSize, batchSz);
-      } else if (targetType == kNoisyNoiselmKeyIdx || targetType == kCleanNoiselmKeyIdx) {
-        
+      } else if (
+          targetType == kNoisyNoiselmKeyIdx ||
+          targetType == kCleanNoiselmKeyIdx) {
         auto tgtVec = dict.mapEntriesToIndices(target);
         tgtVec.emplace_back(dict.getIndex(kEosToken));
         tgtFeat.emplace_back(tgtVec);

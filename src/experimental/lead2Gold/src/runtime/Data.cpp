@@ -30,15 +30,15 @@ std::shared_ptr<NoiseW2lListFilesDataset> createDatasetNoise(
   std::shared_ptr<NoiseW2lListFilesDataset> ds;
 
   ds = std::make_shared<NoiseW2lListFilesDataset>(
-        path,
-        dicts,
-        lexicon,
-        batchSize,
-        worldRank,
-        worldSize,
-        fallback2Ltr,
-        skipUnk,
-        FLAGS_datadir);
+      path,
+      dicts,
+      lexicon,
+      batchSize,
+      worldRank,
+      worldSize,
+      fallback2Ltr,
+      skipUnk,
+      FLAGS_datadir);
   /*
   if (FLAGS_everstoredb) {
 #ifdef W2L_BUILD_FB_DEPENDENCIES

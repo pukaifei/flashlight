@@ -12,17 +12,16 @@
 #include <string>
 #include <vector>
 
-#include <glog/logging.h>
 #include <flashlight/flashlight.h>
+#include <glog/logging.h>
 #include "common/FlashlightUtils.h"
-#include "experimental/lead2Gold/src/common/Defines.h"
-#include "criterion/CriterionUtils.h"
 #include "common/Transforms.h"
+#include "criterion/CriterionUtils.h"
 #include "criterion/SequenceCriterion.h"
 #include "data/Utils.h"
+#include "experimental/lead2Gold/src/common/Defines.h"
 
 namespace w2l {
-
 
 // Helper class used to store data in W2lListFilesDataset
 class SpeechSample2 {
@@ -30,7 +29,8 @@ class SpeechSample2 {
   std::string sampleId_; // utterance id
   std::string audioFilePath_; // full path to audio file
   std::vector<std::string> transcript_; // word transcripts
-  std::vector<std::string> groundTruthTranscript_; // word ground truth transcript
+  std::vector<std::string>
+      groundTruthTranscript_; // word ground truth transcript
 
  public:
   SpeechSample2() {}
@@ -61,7 +61,7 @@ class SpeechSample2 {
     return transcript_;
   }
 
-  void setTranscript(std::vector<std::string> transcript)  {
+  void setTranscript(std::vector<std::string> transcript) {
     transcript_ = transcript;
   }
 
@@ -69,7 +69,8 @@ class SpeechSample2 {
     return groundTruthTranscript_;
   }
 
-  void setGroundTruthTranscript(std::vector<std::string> groundTruthTranscript)  {
+  void setGroundTruthTranscript(
+      std::vector<std::string> groundTruthTranscript) {
     groundTruthTranscript_ = groundTruthTranscript;
   }
 
@@ -81,9 +82,21 @@ class SpeechSample2 {
   }
 };
 
-std::vector<af::array> getUpdateTrancripts(fl::Variable& emissions, std::shared_ptr<SequenceCriterion> criterion, DictionaryMap& dicts, int padidx = -1, bool addeos = false);
-void updateTrancripts(std::vector<af::array>& sample, fl::Variable& emissions, std::shared_ptr<SequenceCriterion> criterion, DictionaryMap& dicts);
+std::vector<af::array> getUpdateTrancripts(
+    fl::Variable& emissions,
+    std::shared_ptr<SequenceCriterion> criterion,
+    DictionaryMap& dicts,
+    int padidx = -1,
+    bool addeos = false);
+void updateTrancripts(
+    std::vector<af::array>& sample,
+    fl::Variable& emissions,
+    std::shared_ptr<SequenceCriterion> criterion,
+    DictionaryMap& dicts);
 
-std::vector<std::vector<std::string>> getUpdateTrancriptsWords(fl::Variable& emissions, std::shared_ptr<SequenceCriterion> criterion, DictionaryMap& dicts);
+std::vector<std::vector<std::string>> getUpdateTrancriptsWords(
+    fl::Variable& emissions,
+    std::shared_ptr<SequenceCriterion> criterion,
+    DictionaryMap& dicts);
 
 } // namespace w2l

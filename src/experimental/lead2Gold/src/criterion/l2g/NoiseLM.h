@@ -1,10 +1,10 @@
 #ifndef NOISELM_INC
 #define NOISELM_INC
 
-#include <memory>
-#include <vector>
 #include <string.h> // memcmp
 #include <iostream>
+#include <memory>
+#include <vector>
 
 #include <flashlight/flashlight.h>
 
@@ -26,19 +26,18 @@ public:
 };
 */
 
-
 class NoiseLM : public fl::Module {
-//protected:
-//  std::vector<fl::Variable> params_;
+  // protected:
+  //  std::vector<fl::Variable> params_;
 
-public:
-  //virtual std::vector<std::shared_ptr<NoiseLMUnit>> units(int64_t B) = 0;
-  //virtual void backward();
-  //virtual void initialize() {};
-  //virtual void update(af::array& pred, af::array& target) {};
-  //virtual void finalize() {};
-  //virtual std::vector<fl::Variable> params() const {return params_;};
-  //virtual ~NoiseLM() {};
+ public:
+  // virtual std::vector<std::shared_ptr<NoiseLMUnit>> units(int64_t B) = 0;
+  // virtual void backward();
+  // virtual void initialize() {};
+  // virtual void update(af::array& pred, af::array& target) {};
+  // virtual void finalize() {};
+  // virtual std::vector<fl::Variable> params() const {return params_;};
+  // virtual ~NoiseLM() {};
 };
 
 /*
@@ -85,7 +84,8 @@ public:
   };
   bool compare(int64_t id1, int64_t id2)
   {
-    return memcmp(&states_[id1*history_size_], &states_[id2*history_size_], sizeof(int64_t)*history_size_) == 0;
+    return memcmp(&states_[id1*history_size_], &states_[id2*history_size_],
+sizeof(int64_t)*history_size_) == 0;
   };
   void print(int64_t id)
   {

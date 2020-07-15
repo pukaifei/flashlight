@@ -12,14 +12,14 @@
 #include <array>
 
 #include <criterion/criterion.h>
-#include "experimental/lead2Gold/src/criterion/l2g/AnalyseBeam.h"
-#include "experimental/lead2Gold/src/criterion/l2g/utoSegBeamNoiseCriterion.h"
-#include "experimental/lead2Gold/src/criterion/l2g/ForceAlignBeamNoise.h"
-#include "experimental/lead2Gold/src/criterion/l2g/NoiseTrie.h"
-#include "experimental/lead2Gold/src/criterion/l2g/NoiseLMZero.h"
-#include "experimental/lead2Gold/src/criterion/l2g/NoiseLMLetterSwapPretrain.h"
-#include "libraries/common/Dictionary.h"
 #include <iomanip>
+#include "experimental/lead2Gold/src/criterion/l2g/AnalyseBeam.h"
+#include "experimental/lead2Gold/src/criterion/l2g/ForceAlignBeamNoise.h"
+#include "experimental/lead2Gold/src/criterion/l2g/NoiseLMLetterSwapPretrain.h"
+#include "experimental/lead2Gold/src/criterion/l2g/NoiseLMZero.h"
+#include "experimental/lead2Gold/src/criterion/l2g/NoiseTrie.h"
+#include "experimental/lead2Gold/src/criterion/l2g/utoSegBeamNoiseCriterion.h"
+#include "libraries/common/Dictionary.h"
 
 using namespace fl;
 using namespace w2l;
@@ -35,7 +35,6 @@ void checkZero(const af::array& val, float precision = kEpsilon) {
 } // namespace
 
 TEST(CriterionTestBEAM, fac_beam_as_fcc_small_input_MINI_to_rm) {
-
   const int N = 2, L = 2, T = 2, B = 1;
 
   // clang-format off

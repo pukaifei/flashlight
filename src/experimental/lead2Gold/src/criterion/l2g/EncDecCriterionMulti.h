@@ -18,10 +18,9 @@
 //#include "criterion/attention/window.h"
 
 //#include "flashlight/contrib/modules/Transformer.h"
-#include "TransformerBlockSimple.h"
 #include "TransformerBlockMultiAttend.h"
+#include "TransformerBlockSimple.h"
 #include "experimental/lead2Gold/src/criterion/l2g/EncDecCriterion.h"
-
 
 namespace w2l {
 
@@ -82,12 +81,11 @@ class EncDecCriterionMulti : public SequenceCriterion {
       bool inc_eos = false);
 
   af::array viterbiCheat(
-    const std::vector<fl::Variable>& encoded,
-    const af::array& cleanTarget,
-    bool inc_eos = false);
+      const std::vector<fl::Variable>& encoded,
+      const af::array& cleanTarget,
+      bool inc_eos = false);
 
-  fl::Variable encodeT(
-      const fl::Variable& inputT);
+  fl::Variable encodeT(const fl::Variable& inputT);
 
   fl::Variable applyPosEmb(const fl::Variable& input, const int offset) const;
 
@@ -95,12 +93,10 @@ class EncDecCriterionMulti : public SequenceCriterion {
       const std::vector<fl::Variable>& encoded,
       const fl::Variable& target);
 
-
-  std::pair<fl::Variable, EDState> decodeStep( 
+  std::pair<fl::Variable, EDState> decodeStep(
       const std::vector<fl::Variable>& encoded,
       const fl::Variable& y,
       const EDState& inState) const;
-
 
   std::vector<CandidateHypo> beamSearch(
       const std::vector<fl::Variable>& encoded,
@@ -109,20 +105,24 @@ class EncDecCriterionMulti : public SequenceCriterion {
       int maxLen,
       float eos_score);
 
-  std::vector<int> beamPath(const std::vector<fl::Variable>& encoded, int beamSize = 10, float eos_score = 0);
-  std::vector<CandidateHypo> beamSearchRes(const std::vector<fl::Variable>& encoded, int beamSize = 10, float eos_score = 0);
+  std::vector<int> beamPath(
+      const std::vector<fl::Variable>& encoded,
+      int beamSize = 10,
+      float eos_score = 0);
+  std::vector<CandidateHypo> beamSearchRes(
+      const std::vector<fl::Variable>& encoded,
+      int beamSize = 10,
+      float eos_score = 0);
 
-
-/*
-  std::pair<std::vector<std::vector<float>>, std::vector<EDStatePtr>>
-  decodeBatchStep(
-      const fl::Variable& xEncoded,
-      std::vector<fl::Variable>& ys,
-      const std::vector<EDState*>& inStates,
-      //const int attentionThreshold,
-      const float smoothingTemperature) const;
-*/
-
+  /*
+    std::pair<std::vector<std::vector<float>>, std::vector<EDStatePtr>>
+    decodeBatchStep(
+        const fl::Variable& xEncoded,
+        std::vector<fl::Variable>& ys,
+        const std::vector<EDState*>& inStates,
+        //const int attentionThreshold,
+        const float smoothingTemperature) const;
+  */
 
   std::string prettyString() const override;
 
@@ -135,14 +135,14 @@ class EncDecCriterionMulti : public SequenceCriterion {
   }
 
   std::shared_ptr<w2l::TransformerBlockMultiAttend> layerDec(int i) const {
-    return std::static_pointer_cast<w2l::TransformerBlockMultiAttend>(module(i + nLayerEncT_ + 1));
+    return std::static_pointer_cast<w2l::TransformerBlockMultiAttend>(
+        module(i + nLayerEncT_ + 1));
   }
 
-  
   std::shared_ptr<fl::Linear> linearOut() const {
-    return std::static_pointer_cast<fl::Linear>(module(nLayerEncT_ + nLayerDec_ + 1));
+    return std::static_pointer_cast<fl::Linear>(
+        module(nLayerEncT_ + nLayerDec_ + 1));
   }
-  
 
   fl::Variable startEmbedding() const {
     return params_.back();
@@ -156,8 +156,8 @@ class EncDecCriterionMulti : public SequenceCriterion {
   int nLayerDec_;
   bool useSinPosEmb_;
   bool posEmbEveryLayer_;
-  //std::shared_ptr<WindowBase> window_;
-  //bool trainWithWindow_;
+  // std::shared_ptr<WindowBase> window_;
+  // bool trainWithWindow_;
   double labelSmooth_;
   double pctTeacherForcing_;
   fl::Variable sinPosEmb;
@@ -169,8 +169,8 @@ class EncDecCriterionMulti : public SequenceCriterion {
       maxDecoderOutputLen_,
       nLayerEncT_,
       nLayerDec_,
-      //window_,
-      //trainWithWindow_,
+      // window_,
+      // trainWithWindow_,
       labelSmooth_,
       pctTeacherForcing_,
       useSinPosEmb_,

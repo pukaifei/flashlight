@@ -15,17 +15,17 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-#include "experimental/lead2Gold/src/common/Defines.h"
 #include "common/FlashlightUtils.h"
 #include "common/Transforms.h"
+#include "experimental/lead2Gold/src/common/Defines.h"
 #include "experimental/lead2Gold/src/criterion/criterion.h"
 #include "experimental/lead2Gold/src/data/Featurize.h"
 #include "libraries/common/Dictionary.h"
 #include "module/module.h"
 #include "runtime/runtime.h"
 
-#include <iostream>
 #include <fstream>
+#include <iostream>
 
 using namespace w2l;
 
@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
 
   /* ===================== Create Dictionary ===================== */
 
-  //auto tokenDict = createTokenDict();
+  // auto tokenDict = createTokenDict();
   Dictionary tokenDict(pathsConcat(FLAGS_tokensdir, FLAGS_tokens));
   for (int64_t r = 1; r <= FLAGS_replabel; ++r) {
     tokenDict.addEntry(std::to_string(r));
@@ -90,12 +90,15 @@ int main(int argc, char** argv) {
   int numClasses = tokenDict.indexSize();
   LOG(INFO) << "Number of classes (network): " << numClasses;
 
-  //auto lexicon = loadWords(FLAGS_lexicon, FLAGS_maxword);
-  //auto wordDict = createWordDict(lexicon);
-  //LOG(INFO) << "Number of words: " << wordDict.indexSize();
+  // auto lexicon = loadWords(FLAGS_lexicon, FLAGS_maxword);
+  // auto wordDict = createWordDict(lexicon);
+  // LOG(INFO) << "Number of words: " << wordDict.indexSize();
 
-  //DictionaryMap dicts = {{kTargetIdx, tokenDict}, {kWordIdx, wordDict}, {kNoiseKeyIdx, tokenDict},{kCleanKeyIdx, tokenDict}};
-  DictionaryMap dicts = {{kTargetIdx, tokenDict}, {kNoiseKeyIdx, tokenDict}, {kCleanKeyIdx, tokenDict}};
+  // DictionaryMap dicts = {{kTargetIdx, tokenDict}, {kWordIdx, wordDict},
+  // {kNoiseKeyIdx, tokenDict},{kCleanKeyIdx, tokenDict}};
+  DictionaryMap dicts = {{kTargetIdx, tokenDict},
+                         {kNoiseKeyIdx, tokenDict},
+                         {kCleanKeyIdx, tokenDict}};
 
   Dictionary wordDict;
   LexiconMap lexicon;
@@ -119,29 +122,37 @@ int main(int argc, char** argv) {
 
   auto transition = criterion->param(0).array();
   int sample_id = 0;
-  std::ofstream myfile (FLAGS_saveExamplePathFolder + "/list_files.txt");
+  std::ofstream myfile(FLAGS_saveExamplePathFolder + "/list_files.txt");
   for (auto& sample : *ds) {
     sample_id += 1;
-    auto emission = network->forward({fl::input(sample[kInputIdx])}).front().array();
+    auto emission =
+        network->forward({fl::input(sample[kInputIdx])}).front().array();
     auto ltrTarget = sample[kTargetIdx];
-    auto ltrKeyTarget = sample[kNoiseKeyIdx]; //without rep label
+    auto ltrKeyTarget = sample[kNoiseKeyIdx]; // without rep label
     auto ltrKeyTargetClean = sample[kCleanKeyIdx];
     int L = sample[kTargetIdx].dims(0);
     int N = emission.dims(0);
     int T = emission.dims(1);
     int B = emission.dims(2);
 
-    //std::cout << "T: " << T << std::endl;
-    //af::print("ltrKeyTargetClean_af", ltrKeyTargetClean);
-    //af::print("ltrKeyTarget", ltrKeyTarget);
-    //af::print("ltrTarget", ltrTarget);
+    // std::cout << "T: " << T << std::endl;
+    // af::print("ltrKeyTargetClean_af", ltrKeyTargetClean);
+    // af::print("ltrKeyTarget", ltrKeyTarget);
+    // af::print("ltrTarget", ltrTarget);
 
     /* ====== Serialize emission and targets for decoding ====== */
-    //std::string cleanedTestPath = cleanFilepath(FLAGS_test);
-    std::string savePath = FLAGS_saveExamplePathFolder + "/" + std::to_string(sample_id) + "_size_" + std::to_string(B) + ".bin";
+    // std::string cleanedTestPath = cleanFilepath(FLAGS_test);
+    std::string savePath = FLAGS_saveExamplePathFolder + "/" +
+        std::to_string(sample_id) + "_size_" + std::to_string(B) + ".bin";
     myfile << savePath << "\n";
     LOG(INFO) << "[Serialization] Saving into file: " << savePath;
-    W2lSerializer::save(savePath, emission, transition, ltrTarget, ltrKeyTarget, ltrKeyTargetClean);
+    W2lSerializer::save(
+        savePath,
+        emission,
+        transition,
+        ltrTarget,
+        ltrKeyTarget,
+        ltrKeyTargetClean);
   }
   myfile.close();
 

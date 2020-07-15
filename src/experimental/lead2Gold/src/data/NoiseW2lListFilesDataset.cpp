@@ -7,10 +7,9 @@
  */
 
 #include <glog/logging.h>
+#include <string.h>
 #include <functional>
 #include <numeric>
-#include <string.h>
-
 
 #include "experimental/lead2Gold/src/common/Defines.h"
 #include "experimental/lead2Gold/src/data/NoiseW2lListFilesDataset.h"
@@ -95,13 +94,14 @@ std::vector<af::array> NoiseW2lListFilesDataset::get(const int64_t idx) const {
   return result;
 }
 
-
-W2lFeatureData NoiseW2lListFilesDataset::getFeatureData(const int64_t idx) const {
+W2lFeatureData NoiseW2lListFilesDataset::getFeatureData(
+    const int64_t idx) const {
   auto ldData = getLoaderData(idx);
   return featurize2(ldData, dicts_);
 }
 
-W2lFeatureData NoiseW2lListFilesDataset::getFeatureDataAndPrefetch(const int64_t idx) const {
+W2lFeatureData NoiseW2lListFilesDataset::getFeatureDataAndPrefetch(
+    const int64_t idx) const {
   W2lFeatureData feat;
   // check cache
   auto cachedata = prefetchCache_.find(idx);
@@ -135,8 +135,6 @@ W2lFeatureData NoiseW2lListFilesDataset::getFeatureDataAndPrefetch(const int64_t
   return feat;
 }
 
-
-
 std::vector<W2lLoaderData> NoiseW2lListFilesDataset::getLoaderData(
     const int64_t idx) const {
   std::vector<W2lLoaderData> data(sampleBatches_[idx].size(), W2lLoaderData());
@@ -163,23 +161,21 @@ std::vector<W2lLoaderData> NoiseW2lListFilesDataset::getLoaderData(
         fallback2Ltr_,
         skipUnk_);
 
-    //TODO use a flag to trigger that if needed.
-    if (FLAGS_storeForNoiselm){
-    data[id].targets[kCleanNoiselmKeyIdx] = wrd2Target(
-        data_[i].getGroundTruthTranscript(),
-        lexicon_,
-        dicts_.at(kCleanNoiselmKeyIdx),
-        fallback2Ltr_,
-        skipUnk_);
-    data[id].targets[kNoisyNoiselmKeyIdx] = wrd2Target(
-        data_[i].getTranscript(),
-        lexicon_,
-        dicts_.at(kNoisyNoiselmKeyIdx),
-        fallback2Ltr_,
-        skipUnk_);
+    // TODO use a flag to trigger that if needed.
+    if (FLAGS_storeForNoiselm) {
+      data[id].targets[kCleanNoiselmKeyIdx] = wrd2Target(
+          data_[i].getGroundTruthTranscript(),
+          lexicon_,
+          dicts_.at(kCleanNoiselmKeyIdx),
+          fallback2Ltr_,
+          skipUnk_);
+      data[id].targets[kNoisyNoiselmKeyIdx] = wrd2Target(
+          data_[i].getTranscript(),
+          lexicon_,
+          dicts_.at(kNoisyNoiselmKeyIdx),
+          fallback2Ltr_,
+          skipUnk_);
     }
-
-
 
     if (includeWrd_) {
       data[id].targets[kWordIdx] = data_[i].getTranscript();
@@ -187,11 +183,11 @@ std::vector<W2lLoaderData> NoiseW2lListFilesDataset::getLoaderData(
 
     if (FLAGS_storeGroundTruth) {
       data[id].targets[kCleanKeyIdx] = wrd2Target(
-        data_[i].getGroundTruthTranscript(),
-        lexicon_,
-        dicts_.at(kTargetIdx),
-        fallback2Ltr_,
-        skipUnk_);
+          data_[i].getGroundTruthTranscript(),
+          lexicon_,
+          dicts_.at(kTargetIdx),
+          fallback2Ltr_,
+          skipUnk_);
     }
   }
   return data;
@@ -207,14 +203,16 @@ void NoiseW2lListFilesDataset::eraseTargets(const int64_t idx) {
     }
     std::vector<std::string> emptyTranscript = {};
     data_[i].setTranscript(emptyTranscript);
-
   }
 }
 
-void NoiseW2lListFilesDataset::updateTargets(const int64_t idx, const std::vector<std::vector<std::string>>& newTranscriptions, bool toGroundTruth) {
-  if (sampleBatches_[idx].size() != newTranscriptions.size()){
+void NoiseW2lListFilesDataset::updateTargets(
+    const int64_t idx,
+    const std::vector<std::vector<std::string>>& newTranscriptions,
+    bool toGroundTruth) {
+  if (sampleBatches_[idx].size() != newTranscriptions.size()) {
     throw std::out_of_range(
-          "W2lListFilesDataset::updateTargets batch size is not the same for the sample and the provided new transcriptions");
+        "W2lListFilesDataset::updateTargets batch size is not the same for the sample and the provided new transcriptions");
   }
 
   for (int64_t id = 0; id < sampleBatches_[idx].size(); ++id) {
@@ -224,9 +222,9 @@ void NoiseW2lListFilesDataset::updateTargets(const int64_t idx, const std::vecto
       throw std::out_of_range(
           "W2lListFilesDataset::updateTargets idx out of range");
     }
-    if (toGroundTruth){
+    if (toGroundTruth) {
       data_[i].setGroundTruthTranscript(newTranscriptions[id]);
-    }else{
+    } else {
       data_[i].setTranscript(newTranscriptions[id]);
     }
   }
@@ -243,7 +241,6 @@ void NoiseW2lListFilesDataset::copyToGroundTruthTranscript(const int64_t idx) {
     data_[i].setGroundTruthTranscript(data_[i].getTranscript());
   }
 }
-
 
 std::vector<float> NoiseW2lListFilesDataset::loadSound(
     const std::string& audioHandle) const {
@@ -263,15 +260,18 @@ std::vector<SpeechSampleMetaInfo> NoiseW2lListFilesDataset::loadListFile(
   auto curDataSize = data_.size();
   int64_t idx = curDataSize;
   while (std::getline(infile, line)) {
-    // tab separated mode. May contain 0 or 1 target or 1 target + 1 ground truth
+    // tab separated mode. May contain 0 or 1 target or 1 target + 1 ground
+    // truth
     if (line.find("\t") != std::string::npos) {
       double audioLength;
-      auto tokens_tab = splitOnAnyOf("\t", line, false); //we check if the ground truth is given
+      auto tokens_tab = splitOnAnyOf(
+          "\t", line, false); // we check if the ground truth is given
       audioLength = std::stod(tokens_tab[2]);
 
-      if (tokens_tab.size() == 5){
-        //LOG_IF(FATAL, tokens_tab.size() < 5) << "Cannot parse, ground truth not given " << line;
-        //LOG(INFO) << "Noisy transcriptions and ground truth provided for " << filename;
+      if (tokens_tab.size() == 5) {
+        // LOG_IF(FATAL, tokens_tab.size() < 5) << "Cannot parse, ground truth
+        // not given " << line; LOG(INFO) << "Noisy transcriptions and ground
+        // truth provided for " << filename;
         auto train_trans = splitOnWhitespace(tokens_tab[3], true);
         auto train_truth = splitOnWhitespace(tokens_tab[4], true);
 
@@ -282,24 +282,21 @@ std::vector<SpeechSampleMetaInfo> NoiseW2lListFilesDataset::loadListFile(
             std::vector<std::string>(train_truth.begin(), train_truth.end())));
 
       } else if (tokens_tab.size() == 4) {
-        //LOG(INFO) << "1 transcription provided for " << filename;
+        // LOG(INFO) << "1 transcription provided for " << filename;
         auto train_trans = splitOnWhitespace(tokens_tab[3], true);
 
-        //LOG_IF(FATAL, tokens.size() < 4) << "Cannot parse " << line;
+        // LOG_IF(FATAL, tokens.size() < 4) << "Cannot parse " << line;
 
         data_.emplace_back(SpeechSample2(
             tokens_tab[0],
             tokens_tab[1],
             std::vector<std::string>(train_trans.begin(), train_trans.end())));
-      
-      } else if (tokens_tab.size() == 3) { //unsupervised data
 
-        data_.emplace_back(SpeechSample2(
-            tokens_tab[0],
-            tokens_tab[1],
-            {}));
+      } else if (tokens_tab.size() == 3) { // unsupervised data
 
-      } else{
+        data_.emplace_back(SpeechSample2(tokens_tab[0], tokens_tab[1], {}));
+
+      } else {
         LOG_IF(FATAL, true) << "Cannot parse " << filename;
       }
 
@@ -314,8 +311,8 @@ std::vector<SpeechSampleMetaInfo> NoiseW2lListFilesDataset::loadListFile(
           SpeechSampleMetaInfo(audioLength, targets.size(), idx));
 
       ++idx;
-    } else{
-      //Normal mode. 1 target transcription
+    } else {
+      // Normal mode. 1 target transcription
       auto tokens = splitOnWhitespace(line, true);
 
       LOG_IF(FATAL, tokens.size() < 3) << "Cannot parse " << line;
@@ -338,14 +335,11 @@ std::vector<SpeechSampleMetaInfo> NoiseW2lListFilesDataset::loadListFile(
 
       ++idx;
     }
-
-
   }
 
   LOG(INFO) << samplesMetaInfo.size() << " files found. ";
 
   return samplesMetaInfo;
 }
-
 
 } // namespace w2l

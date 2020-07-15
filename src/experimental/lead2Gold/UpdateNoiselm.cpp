@@ -16,22 +16,20 @@
 #include <glog/logging.h>
 #include <math.h>
 
-#include "experimental/lead2Gold/src/common/Defines.h"
 #include "common/FlashlightUtils.h"
 #include "common/Transforms.h"
+#include "experimental/lead2Gold/src/common/Defines.h"
 #include "experimental/lead2Gold/src/criterion/criterion.h"
 #include "experimental/lead2Gold/src/data/Featurize.h"
 #include "libraries/common/Dictionary.h"
 #include "module/module.h"
-#include "runtime/runtime.h"
 #include "runtime/SpeechStatMeter.h"
+#include "runtime/runtime.h"
 
-
-#include <iostream>
 #include <fstream>
+#include <iostream>
 
 using namespace w2l;
-
 
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
@@ -71,8 +69,6 @@ int main(int argc, char** argv) {
         1.0 / fl::getWorldSize(), true, true);
   }
 
-
-
   int worldRank = fl::getWorldRank();
   int worldSize = fl::getWorldSize();
   bool isMaster = (worldRank == 0);
@@ -82,17 +78,16 @@ int main(int argc, char** argv) {
   std::shared_ptr<SequenceCriterion> criterion;
   std::unordered_map<std::string, std::string> cfg;
   LOG(INFO) << "[Network] Reading acoustic model from " << FLAGS_am;
-  
 
   if (0) {
     std::vector<fl::Variable> noiselmparams;
     std::shared_ptr<fl::FirstOrderOptimizer> netoptim;
     std::shared_ptr<fl::FirstOrderOptimizer> critoptim;
-    W2lSerializer::load(FLAGS_am, cfg, network, criterion, netoptim, critoptim, noiselmparams);
-  } else{
+    W2lSerializer::load(
+        FLAGS_am, cfg, network, criterion, netoptim, critoptim, noiselmparams);
+  } else {
     W2lSerializer::load(FLAGS_am, cfg, network, criterion);
   }
-
 
   LOG(INFO) << "[Network] " << network->prettyString();
   LOG(INFO) << "[Criterion] " << criterion->prettyString();
@@ -115,7 +110,7 @@ int main(int argc, char** argv) {
 
   /* ===================== Create Dictionary ===================== */
 
-  //auto tokenDict = createTokenDict();
+  // auto tokenDict = createTokenDict();
   Dictionary tokenDict(pathsConcat(FLAGS_tokensdir, FLAGS_tokens));
   for (int64_t r = 1; r <= FLAGS_replabel; ++r) {
     tokenDict.addEntry(std::to_string(r));
@@ -123,12 +118,15 @@ int main(int argc, char** argv) {
   int numClasses = tokenDict.indexSize();
   LOG(INFO) << "Number of classes (network): " << numClasses;
 
-  //auto lexicon = loadWords(FLAGS_lexicon, FLAGS_maxword);
-  //auto wordDict = createWordDict(lexicon);
-  //LOG(INFO) << "Number of words: " << wordDict.indexSize();
+  // auto lexicon = loadWords(FLAGS_lexicon, FLAGS_maxword);
+  // auto wordDict = createWordDict(lexicon);
+  // LOG(INFO) << "Number of words: " << wordDict.indexSize();
 
-  //DictionaryMap dicts = {{kTargetIdx, tokenDict}, {kWordIdx, wordDict}, {kNoiseKeyIdx, tokenDict},{kCleanKeyIdx, tokenDict}};
-  DictionaryMap dicts = {{kTargetIdx, tokenDict}, {kNoiseKeyIdx, tokenDict}, {kCleanKeyIdx, tokenDict}};
+  // DictionaryMap dicts = {{kTargetIdx, tokenDict}, {kWordIdx, wordDict},
+  // {kNoiseKeyIdx, tokenDict},{kCleanKeyIdx, tokenDict}};
+  DictionaryMap dicts = {{kTargetIdx, tokenDict},
+                         {kNoiseKeyIdx, tokenDict},
+                         {kCleanKeyIdx, tokenDict}};
 
   Dictionary wordDict;
   LexiconMap lexicon;
@@ -140,51 +138,63 @@ int main(int argc, char** argv) {
   }
 
   /* ===================== Create Dataset ===================== */
-  
-  auto ds = createDataset(
-      FLAGS_train, dicts, lexicon, 1, worldRank, worldSize);
+
+  auto ds = createDataset(FLAGS_train, dicts, lexicon, 1, worldRank, worldSize);
   int nSamples = ds->size();
   ds->shuffle(FLAGS_seed);
 
-  auto ds_valid = createDataset(
-        FLAGS_valid, dicts, lexicon, 1, worldRank, worldSize);
+  auto ds_valid =
+      createDataset(FLAGS_valid, dicts, lexicon, 1, worldRank, worldSize);
 
   LOG(INFO) << "[Dataset] Dataset loaded.";
 
   /*  Construct ForceAlignBeamNoise criterion  */
-  
-  int N_=29;
+
+  int N_ = 29;
   w2l::Dictionary noise_keys;
   std::string token_list = "|'abcdefghijklmnopqrstuvwxyz";
-  for(int i = 0; i < N_-1; i++) {
+  for (int i = 0; i < N_ - 1; i++) {
     std::string s(1, token_list[i]);
-    noise_keys.addEntry(s,i);
+    noise_keys.addEntry(s, i);
   }
 
-
-  std::shared_ptr<NoiseLMLetterSwapUnit> noiselm = std::make_shared<NoiseLMLetterSwapUnit>("",
-                                                    "zeronoiselm", noise_keys, FLAGS_allowSwap, FLAGS_allowInsertion, FLAGS_allowDeletion,
-                                                    false, FLAGS_scale_noise, 1, 1, 1, 0);
+  std::shared_ptr<NoiseLMLetterSwapUnit> noiselm =
+      std::make_shared<NoiseLMLetterSwapUnit>(
+          "",
+          "zeronoiselm",
+          noise_keys,
+          FLAGS_allowSwap,
+          FLAGS_allowInsertion,
+          FLAGS_allowDeletion,
+          false,
+          FLAGS_scale_noise,
+          1,
+          1,
+          1,
+          0);
 
   if (isMaster)
     noiselm->displayNoiseModel();
 
   w2l::SpeechStatMeter speechmtr;
   noiselm->trainModel(
-    ds,
-    network,
-    criterion,
-    dicts,
-    FLAGS_enable_distributed,
-    (int)FLAGS_replabel,
-    speechmtr
-  );
+      ds,
+      network,
+      criterion,
+      dicts,
+      FLAGS_enable_distributed,
+      (int)FLAGS_replabel,
+      speechmtr);
 
   if (isMaster)
     noiselm->displayNoiseModel();
-  //noiselm->displayNoiseModel(true);
+  // noiselm->displayNoiseModel(true);
 
-  fl::Variable editDist(af::array& str1_af, af::array& str2_af,  w2l::DictionaryMap& dicts, int replabel);
+  fl::Variable editDist(
+      af::array & str1_af,
+      af::array & str2_af,
+      w2l::DictionaryMap & dicts,
+      int replabel);
 
   auto p_noise_clean = fl::AverageValueMeter();
   int sample_id = 0;
@@ -194,15 +204,17 @@ int main(int argc, char** argv) {
     network->eval();
     auto output = network->forward({fl::input(sample[kInputIdx])}).front();
     auto updatedTranscripts = getUpdateTrancripts(output, criterion, dicts);
-    
+
     af::array cleanTarget = sample[w2l::kTargetIdx];
     af::array noisyTarget = updatedTranscripts[1];
 
-    noiselm->evalBatch(cleanTarget, noisyTarget, dicts, FLAGS_replabel, p_noise_clean);
-
+    noiselm->evalBatch(
+        cleanTarget, noisyTarget, dicts, FLAGS_replabel, p_noise_clean);
   }
 
-  std::cout << "p_noise_clean: " << p_noise_clean.value()[0] << ", standard deviation: " << sqrt(p_noise_clean.value()[1]) << std::endl;
+  std::cout << "p_noise_clean: " << p_noise_clean.value()[0]
+            << ", standard deviation: " << sqrt(p_noise_clean.value()[1])
+            << std::endl;
   std::cout << "Removed: " << nbRemoved << std::endl;
   return 0;
 }

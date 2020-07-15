@@ -84,8 +84,10 @@ TransformerBlockAttend::TransformerBlockAttend(
       pDropout_(pDropout),
       pLayerdrop_(pLayerdrop),
       usePosEmb_(usePosEmb),
-      w1_(std::make_shared<fl::Linear>(transformerInitLinear(modelDim, mlpDim))),
-      w2_(std::make_shared<fl::Linear>(transformerInitLinear(mlpDim, modelDim))),
+      w1_(std::make_shared<fl::Linear>(
+          transformerInitLinear(modelDim, mlpDim))),
+      w2_(std::make_shared<fl::Linear>(
+          transformerInitLinear(mlpDim, modelDim))),
       wq_auto_(std::make_shared<fl::Linear>(
           transformerInitLinear(modelDim, headDim * nHeads))),
       wk_auto_(std::make_shared<fl::Linear>(
@@ -105,8 +107,7 @@ TransformerBlockAttend::TransformerBlockAttend(
       norm1_(std::make_shared<fl::LayerNorm>(std::vector<int>({0, 3}))),
       norm2_(std::make_shared<fl::LayerNorm>(std::vector<int>({0, 3}))),
       norm3_(std::make_shared<fl::LayerNorm>(std::vector<int>({0, 3}))) {
-
-  if (usePosEmb_){
+  if (usePosEmb_) {
     params_.push_back(fl::uniform(2 * bptt - 1, modelDim / nHeads, -0.1, 0.1));
   }
   add(w1_);
@@ -138,7 +139,9 @@ fl::Variable TransformerBlockAttend::getMask(int32_t n, bool cache) {
   return fl::Variable(af::log(mask), false);
 }
 
-fl::Variable TransformerBlockAttend::selfAttention(const std::vector<fl::Variable>& input, const int32_t offset = 0) {
+fl::Variable TransformerBlockAttend::selfAttention(
+    const std::vector<fl::Variable>& input,
+    const int32_t offset = 0) {
   int n = input[0].dims(1), bsz = input[0].dims(2);
   double pDrop = train_ ? pDropout_ : 0.0;
 
@@ -147,7 +150,7 @@ fl::Variable TransformerBlockAttend::selfAttention(const std::vector<fl::Variabl
   auto v = fl::transpose((*wv_auto_)(fl::concatenate(input, 1)));
 
   fl::Variable mask, posEmb;
-  if (usePosEmb_){
+  if (usePosEmb_) {
     posEmb = tile(params_[0], af::dim4(1, 1, nHeads_ * bsz));
   }
   if (input.back().dims(1) > 1) {
@@ -161,17 +164,20 @@ fl::Variable TransformerBlockAttend::selfAttention(const std::vector<fl::Variabl
   return result;
 }
 
-
-fl::Variable TransformerBlockAttend::Attention(const fl::Variable& input, const std::vector<fl::Variable>& encoded, const int32_t offset = 0) {
+fl::Variable TransformerBlockAttend::Attention(
+    const fl::Variable& input,
+    const std::vector<fl::Variable>& encoded,
+    const int32_t offset = 0) {
   int n = input.dims(1), bsz = input.dims(2);
   double pDrop = train_ ? pDropout_ : 0.0;
 
   auto q = fl::transpose((*wq2_)(input));
-  auto k = fl::transpose((*wk2_)(encoded.back())); // TODO, support multiple source of attention
+  auto k = fl::transpose(
+      (*wk2_)(encoded.back())); // TODO, support multiple source of attention
   auto v = fl::transpose((*wv2_)(encoded.back()));
 
   fl::Variable mask, posEmb; // mask unused
-  //posEmb = tile(params_[0], af::dim4(1, 1, nHeads_ * bsz));
+  // posEmb = tile(params_[0], af::dim4(1, 1, nHeads_ * bsz));
 
   auto result = transformerMultiheadAttention(
       q, k, v, posEmb, mask, nHeads_, pDrop, offset);
@@ -180,8 +186,9 @@ fl::Variable TransformerBlockAttend::Attention(const fl::Variable& input, const 
   return result;
 }
 
-
-std::vector<fl::Variable> TransformerBlockAttend::forward(const std::vector<fl::Variable>& input, const std::vector<fl::Variable>& encoded) {
+std::vector<fl::Variable> TransformerBlockAttend::forward(
+    const std::vector<fl::Variable>& input,
+    const std::vector<fl::Variable>& encoded) {
   auto x = input.back();
   float f = 1.0;
   if (train_ && (af::randu(1).scalar<float>() < pLayerdrop_)) {
@@ -196,7 +203,8 @@ std::vector<fl::Variable> TransformerBlockAttend::forward(const std::vector<fl::
   return {(*norm3_)(f * mlp(h) + h)};
 }
 
-std::vector<fl::Variable> TransformerBlockAttend::forward(const std::vector<fl::Variable>& input) { 
+std::vector<fl::Variable> TransformerBlockAttend::forward(
+    const std::vector<fl::Variable>& input) {
   return forward(input, input);
 }
 
@@ -206,4 +214,4 @@ std::string TransformerBlockAttend::prettyString() const {
 
 TransformerBlockAttend::TransformerBlockAttend() {}
 
-} // namespace fl
+} // namespace w2l

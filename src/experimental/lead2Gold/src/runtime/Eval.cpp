@@ -13,10 +13,9 @@
 
 #include "common/FlashlightUtils.h"
 #include "common/Transforms.h"
-#include "experimental/lead2Gold/src/runtime/Logger.h"
-#include "experimental/lead2Gold/src/data/Utils.h"
 #include "experimental/lead2Gold/src/common/Utils.h"
-
+#include "experimental/lead2Gold/src/data/Utils.h"
+#include "experimental/lead2Gold/src/runtime/Logger.h"
 
 namespace w2l {
 
@@ -33,14 +32,14 @@ void evalOutput(
         afToVector<int>(criterion->viterbiPath(op(af::span, af::span, b)));
     auto tgtraw = afToVector<int>(tgt);
 
-    //uniq(viterbipath);
+    // uniq(viterbipath);
 
     // Remove `-1`s appended to the target for batching (if any)
     auto labellen = getTargetSize(tgtraw.data(), tgtraw.size());
     tgtraw.resize(labellen);
 
-    //remapLabels(viterbipath, tgtDict);
-    //remapLabels(tgtraw, tgtDict);
+    // remapLabels(viterbipath, tgtDict);
+    // remapLabels(tgtraw, tgtDict);
 
     auto ltrPred = NoisetknPrediction2Ltr(viterbipath, tgtDict);
     auto ltrTgt = tknTarget2Ltr(tgtraw, tgtDict);
@@ -52,13 +51,12 @@ void evalOutput(
   }
 }
 
-
 void evalDataset(
     std::shared_ptr<fl::Module> ntwrk,
     std::shared_ptr<SequenceCriterion> criterion,
     std::shared_ptr<AutoSegBeamNoiseCriterion> asgbeamnoisecrit,
     std::shared_ptr<NoiseLMLetterSwapUnit> noiselm,
-    int replabel, 
+    int replabel,
     std::shared_ptr<W2lDataset> testds,
     SSLDatasetMeters& mtrs,
     DictionaryMap& dicts,
@@ -66,24 +64,34 @@ void evalDataset(
   resetDatasetMeters(mtrs);
   for (auto& sample : *testds) {
     auto output = ntwrk->forward({fl::input(sample[kInputIdx])}).front();
-    //Compute paired metrics
-    auto lossPaired =
-        criterion->forward({output, fl::Variable(sample[kTargetIdx], false)})[0];
+    // Compute paired metrics
+    auto lossPaired = criterion->forward(
+        {output, fl::Variable(sample[kTargetIdx], false)})[0];
     mtrs.losses[kASRPaired].add(lossPaired.array());
-        
-    if (noiselm && evalbeamnoise){
-        std::vector<af::array> updatedTranscripts;
-        updatedTranscripts = getUpdateTrancripts(output, criterion, dicts);
-        auto nullVar = fl::Variable();
-        auto lossUnpaired = 
-            asgbeamnoisecrit->forward(output, nullVar, criterion->param(0), fl::noGrad(updatedTranscripts[0]), fl::noGrad(updatedTranscripts[1])).front();
-        mtrs.losses[kASRUnpaired].add(lossUnpaired.array());
+
+    if (noiselm && evalbeamnoise) {
+      std::vector<af::array> updatedTranscripts;
+      updatedTranscripts = getUpdateTrancripts(output, criterion, dicts);
+      auto nullVar = fl::Variable();
+      auto lossUnpaired = asgbeamnoisecrit
+                              ->forward(
+                                  output,
+                                  nullVar,
+                                  criterion->param(0),
+                                  fl::noGrad(updatedTranscripts[0]),
+                                  fl::noGrad(updatedTranscripts[1]))
+                              .front();
+      mtrs.losses[kASRUnpaired].add(lossUnpaired.array());
     }
 
-    evalOutput(output.array(), sample[kTargetIdx], mtrs.edits, dicts[kTargetIdx], criterion);
+    evalOutput(
+        output.array(),
+        sample[kTargetIdx],
+        mtrs.edits,
+        dicts[kTargetIdx],
+        criterion);
   }
 }
-
 
 void runEval(
     std::shared_ptr<fl::Module> network,
@@ -99,7 +107,15 @@ void runEval(
   criterion->eval();
   for (auto& d : ds) {
     evalDataset(
-        network, criterion, asgbeamnoisecrit, noiselm, replabel, d.second, meters.valid[d.first], dicts, evalbeamnoise);
+        network,
+        criterion,
+        asgbeamnoisecrit,
+        noiselm,
+        replabel,
+        d.second,
+        meters.valid[d.first],
+        dicts,
+        evalbeamnoise);
   }
 }
 

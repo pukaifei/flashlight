@@ -83,8 +83,10 @@ TransformerBlock::TransformerBlock(
       bptt_(bptt),
       pDropout_(pDropout),
       pLayerdrop_(pLayerdrop),
-      w1_(std::make_shared<fl::Linear>(transformerInitLinear(modelDim, mlpDim))),
-      w2_(std::make_shared<fl::Linear>(transformerInitLinear(mlpDim, modelDim))),
+      w1_(std::make_shared<fl::Linear>(
+          transformerInitLinear(modelDim, mlpDim))),
+      w2_(std::make_shared<fl::Linear>(
+          transformerInitLinear(mlpDim, modelDim))),
       wq_auto_(std::make_shared<fl::Linear>(
           transformerInitLinear(modelDim, headDim * nHeads))),
       wk_auto_(std::make_shared<fl::Linear>(
@@ -104,9 +106,9 @@ TransformerBlock::TransformerBlock(
       norm1_(std::make_shared<fl::LayerNorm>(std::vector<int>({0, 3}))),
       norm2_(std::make_shared<fl::LayerNorm>(std::vector<int>({0, 3}))),
       norm3_(std::make_shared<fl::LayerNorm>(std::vector<int>({0, 3}))) {
-
-  if (usePosEmb_){
-    params_.push_back(fl::uniform(2 * bptt - 1, modelDimOut / nHeads, -0.1, 0.1));
+  if (usePosEmb_) {
+    params_.push_back(
+        fl::uniform(2 * bptt - 1, modelDimOut / nHeads, -0.1, 0.1));
   }
   add(w1_);
   add(w2_);
@@ -137,7 +139,9 @@ fl::Variable TransformerBlock::getMask(int32_t n, bool cache) {
   return fl::Variable(af::log(mask), false);
 }
 
-fl::Variable TransformerBlock::selfAttention(const std::vector<fl::Variable>& input, const int32_t offset = 0) {
+fl::Variable TransformerBlock::selfAttention(
+    const std::vector<fl::Variable>& input,
+    const int32_t offset = 0) {
   int n = input[0].dims(1), bsz = input[0].dims(2);
   double pDrop = train_ ? pDropout_ : 0.0;
 
@@ -158,13 +162,16 @@ fl::Variable TransformerBlock::selfAttention(const std::vector<fl::Variable>& in
   return result;
 }
 
-
-fl::Variable TransformerBlock::Attention(const fl::Variable& input, const std::vector<fl::Variable>& encoded, const int32_t offset = 0) {
+fl::Variable TransformerBlock::Attention(
+    const fl::Variable& input,
+    const std::vector<fl::Variable>& encoded,
+    const int32_t offset = 0) {
   int n = input.dims(1), bsz = input.dims(2);
   double pDrop = train_ ? pDropout_ : 0.0;
 
   auto q = fl::transpose((*wq2_)(input));
-  auto k = fl::transpose((*wk2_)(encoded.back())); // TODO, support multiple source of attention
+  auto k = fl::transpose(
+      (*wk2_)(encoded.back())); // TODO, support multiple source of attention
   auto v = fl::transpose((*wv2_)(encoded.back()));
 
   fl::Variable mask, posEmb; // mask unused
@@ -177,8 +184,9 @@ fl::Variable TransformerBlock::Attention(const fl::Variable& input, const std::v
   return result;
 }
 
-
-std::vector<fl::Variable> TransformerBlock::forward(const std::vector<fl::Variable>& input, const std::vector<fl::Variable>& encoded) {
+std::vector<fl::Variable> TransformerBlock::forward(
+    const std::vector<fl::Variable>& input,
+    const std::vector<fl::Variable>& encoded) {
   auto x = input.back();
   float f = 1.0;
   if (train_ && (af::randu(1).scalar<float>() < pLayerdrop_)) {
@@ -193,7 +201,8 @@ std::vector<fl::Variable> TransformerBlock::forward(const std::vector<fl::Variab
   return {(*norm3_)(f * mlp(h) + h)};
 }
 
-std::vector<fl::Variable> TransformerBlock::forward(const std::vector<fl::Variable>& input) { 
+std::vector<fl::Variable> TransformerBlock::forward(
+    const std::vector<fl::Variable>& input) {
   return forward(input, input);
 }
 
@@ -203,4 +212,4 @@ std::string TransformerBlock::prettyString() const {
 
 TransformerBlock::TransformerBlock() {}
 
-} // namespace fl
+} // namespace w2l

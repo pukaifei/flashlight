@@ -1,4 +1,4 @@
- /**
+/**
  * Copyright (c) 2017-present, Facebook, Inc.
  * All rights reserved.
  *
@@ -11,8 +11,8 @@
 #define NOISETRIE_INC
 
 #include <deque>
-#include <vector>
 #include <functional>
+#include <vector>
 
 #include "libraries/common/Dictionary.h"
 
@@ -22,44 +22,57 @@ struct NoiseTrieLabel {
 };
 
 class NoiseTrieNode {
-private:
+ private:
   std::vector<NoiseTrieNode*> children_; /* letters */
   int idx_; /* letter */
   std::deque<NoiseTrieLabel> labels_; /* labels */
   long id_; /* unique id of the node */
-public:
+ public:
   NoiseTrieNode(int nchildren, int idx, long id);
-  int idx() { return idx_; };
-  int id() { return id_; };
+  int idx() {
+    return idx_;
+  };
+  int id() {
+    return id_;
+  };
   std::deque<NoiseTrieLabel>& labels();
   std::vector<NoiseTrieNode*>& children();
   NoiseTrieNode*& child(int idx);
-  void smearing(const std::vector<float>& word_scores, std::vector<float>& node_scores);
+  void smearing(
+      const std::vector<float>& word_scores,
+      std::vector<float>& node_scores);
   ~NoiseTrieNode();
 };
 
 class NoiseTrie {
-private:
-  NoiseTrieNode *root_;
+ private:
+  NoiseTrieNode* root_;
   std::deque<NoiseTrieNode> buffer_;
   int nchildren_;
   void (*printsubwordunit_)(int);
-  NoiseTrieNode *newnode(int nchildren, int idx);
+  NoiseTrieNode* newnode(int nchildren, int idx);
   long node_id_;
   long trielabel_id_;
   void checkempty();
-public:
+
+ public:
   NoiseTrie(int nchildren, int rootidx, void (*printsubwordunit)(int));
-  w2l::Dictionary load(const std::string filename, const w2l::Dictionary& tokens);
+  w2l::Dictionary load(
+      const std::string filename,
+      const w2l::Dictionary& tokens);
   NoiseTrieNode* root();
   NoiseTrieNode* insert(const std::vector<int>& indices, int lm);
   NoiseTrieNode* search(const std::vector<int>& indices);
-  void smearing(const std::vector<float>& word_scores, std::vector<float>& node_scores);
+  void smearing(
+      const std::vector<float>& word_scores,
+      std::vector<float>& node_scores);
   void printsubwordunit(const int l);
   void printword(const int l);
-  void apply(NoiseTrieNode *node, std::function< void(NoiseTrieNode*) > func);
-  size_t nNode() {return buffer_.size(); };
-  ~NoiseTrie();  
+  void apply(NoiseTrieNode* node, std::function<void(NoiseTrieNode*)> func);
+  size_t nNode() {
+    return buffer_.size();
+  };
+  ~NoiseTrie();
 };
 
 #endif

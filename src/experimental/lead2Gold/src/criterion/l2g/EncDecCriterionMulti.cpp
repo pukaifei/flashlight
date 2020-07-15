@@ -51,7 +51,8 @@ EDState selectState(EDState& state, int batchIdx) {
   newState.step = state.step;
   newState.isValid = state.isValid;
   for (int i = 0; i < nbLayer; i++) {
-    newState.hidden[i] = state.hidden[i](af::span, af::span, batchIdx); ///// <--- I changed that
+    newState.hidden[i] =
+        state.hidden[i](af::span, af::span, batchIdx); ///// <--- I changed that
   }
   return newState;
 }
@@ -82,8 +83,9 @@ EncDecCriterionMulti::EncDecCriterionMulti(
       posEmbEveryLayer_(posEmbEveryLayer) {
   add(std::make_shared<fl::Embedding>(modelDimOut, nClass));
   for (size_t i = 0; i < nLayerEncT_; i++) {
-    bool useTrPos = useSinPosEmb ? false : (posEmbEveryLayer_ || i == 0 ? true : false);
-    
+    bool useTrPos =
+        useSinPosEmb ? false : (posEmbEveryLayer_ || i == 0 ? true : false);
+
     add(std::make_shared<TransformerBlockSimple>(
         modelDimOut,
         modelDimOut / 4,
@@ -95,9 +97,10 @@ EncDecCriterionMulti::EncDecCriterionMulti(
         useTrPos));
   }
   for (size_t i = 0; i < nLayerDec_; i++) {
-    bool useTrPos = useSinPosEmb ? false : (posEmbEveryLayer_ || i == 0 ? true : false);
-    //DIM IN 1 = Transcription attention
-    //DIM IN 2 = X attention
+    bool useTrPos =
+        useSinPosEmb ? false : (posEmbEveryLayer_ || i == 0 ? true : false);
+    // DIM IN 1 = Transcription attention
+    // DIM IN 2 = X attention
     add(std::make_shared<w2l::TransformerBlockMultiAttend>(
         modelDimOut,
         modelDimInX,
@@ -111,22 +114,28 @@ EncDecCriterionMulti::EncDecCriterionMulti(
   }
 
   add(std::make_shared<fl::Linear>(modelDimOut, nClass));
-  params_.push_back(fl::uniform(af::dim4{modelDimOut}, -1e-1, 1e-1)); //for initial embedding
+  params_.push_back(
+      fl::uniform(af::dim4{modelDimOut}, -1e-1, 1e-1)); // for initial embedding
 
-  if (useSinPosEmb_){
-    int maxLen = maxDecoderOutputLen + 200; //take some marge 
-    std::vector<float> embFlat(maxLen*modelDimOut);
-    for (int pos = 0 ; pos < maxLen ; pos++){
-      for (int i = 0 ; i < modelDimOut ; i++){
-        if (i % 2 == 0){
-          embFlat[i + modelDimOut * pos] = std::sin((float) pos / (std::pow(10000.0, ((float) i / (float) modelDimOut))));
-        } else{
-          embFlat[i + modelDimOut * pos] = std::cos((float) pos / (std::pow(10000.0, ((float) (i-1) / (float) modelDimOut))));
+  if (useSinPosEmb_) {
+    int maxLen = maxDecoderOutputLen + 200; // take some marge
+    std::vector<float> embFlat(maxLen * modelDimOut);
+    for (int pos = 0; pos < maxLen; pos++) {
+      for (int i = 0; i < modelDimOut; i++) {
+        if (i % 2 == 0) {
+          embFlat[i + modelDimOut * pos] = std::sin(
+              (float)pos /
+              (std::pow(10000.0, ((float)i / (float)modelDimOut))));
+        } else {
+          embFlat[i + modelDimOut * pos] = std::cos(
+              (float)pos /
+              (std::pow(10000.0, ((float)(i - 1) / (float)modelDimOut))));
         }
       }
     }
-    sinPosEmb = fl::Variable(af::array(modelDimOut, maxLen, embFlat.data()), false);
-  } else{
+    sinPosEmb =
+        fl::Variable(af::array(modelDimOut, maxLen, embFlat.data()), false);
+  } else {
     sinPosEmb = fl::Variable();
   }
 }
@@ -158,19 +167,22 @@ std::vector<Variable> EncDecCriterionMulti::forward(
   return {losses, out};
 }
 
-//input of size  D x T x B
-Variable EncDecCriterionMulti::applyPosEmb(const Variable& input, const int offset = 0) const {
-  if (useSinPosEmb_){
-    fl::Variable posEmb = tile(sinPosEmb.cols(offset, offset + (int)input.dims(1) - 1),
-                              af::dim4(1, 1, (int)input.dims(2)));
+// input of size  D x T x B
+Variable EncDecCriterionMulti::applyPosEmb(
+    const Variable& input,
+    const int offset = 0) const {
+  if (useSinPosEmb_) {
+    fl::Variable posEmb = tile(
+        sinPosEmb.cols(offset, offset + (int)input.dims(1) - 1),
+        af::dim4(1, 1, (int)input.dims(2)));
     return input + posEmb;
-  } else{
+  } else {
     return input;
   }
 }
 
-//inputT should be of size U * B
-Variable EncDecCriterionMulti::encodeT(const Variable& inputT){
+// inputT should be of size U * B
+Variable EncDecCriterionMulti::encodeT(const Variable& inputT) {
   auto encoded = embedding()->forward(inputT);
   encoded = applyPosEmb(encoded);
   for (size_t i = 0; i < nLayerEncT_; i++) {
@@ -178,8 +190,6 @@ Variable EncDecCriterionMulti::encodeT(const Variable& inputT){
   }
   return encoded;
 }
-
-
 
 // encoded[0] : D1 x T1 x B, encoded[1] : D2 x T2 x B
 // target: U x B
@@ -189,12 +199,12 @@ std::vector<Variable> EncDecCriterionMulti::vectorizedDecoder(
     const Variable& target) {
   int U = target.dims(0);
   int B = target.dims(1);
-  //int T = encoded.isempty() ? 0 : encoded.dims(1);
+  // int T = encoded.isempty() ? 0 : encoded.dims(1);
 
   auto hy = tile(startEmbedding(), {1, 1, B});
 
   if (U > 1) {
-    auto y = target(af::seq(0, U - 2), af::span); //remove last token
+    auto y = target(af::seq(0, U - 2), af::span); // remove last token
 
     if (train_) {
       // TODO: other sampling strategies
@@ -209,12 +219,12 @@ std::vector<Variable> EncDecCriterionMulti::vectorizedDecoder(
     hy = concatenate({hy, yEmbed}, 1); // Add one initial embedding
   }
 
-  if (!posEmbEveryLayer_){
+  if (!posEmbEveryLayer_) {
     hy = applyPosEmb(hy);
   }
-  //Variable alpha, summaries;
+  // Variable alpha, summaries;
   for (int i = 0; i < nLayerDec_; i++) {
-    if (posEmbEveryLayer_){
+    if (posEmbEveryLayer_) {
       hy = applyPosEmb(hy);
     }
     hy = layerDec(i)->forward(std::vector<Variable>({hy}), encoded).front();
@@ -225,8 +235,8 @@ std::vector<Variable> EncDecCriterionMulti::vectorizedDecoder(
   return {out};
 }
 
-
-af::array EncDecCriterionMulti::viterbiPath(const std::vector<Variable>& encoded) {
+af::array EncDecCriterionMulti::viterbiPath(
+    const std::vector<Variable>& encoded) {
   return viterbiPathBase(encoded);
 }
 
@@ -242,13 +252,13 @@ af::array EncDecCriterionMulti::viterbiPathBase(
   int pred;
 
   for (int u = 0; u < maxDecoderOutputLen_; u++) {
-    //ox = decodeStep(Variable(encoded, false), y);
+    // ox = decodeStep(Variable(encoded, false), y);
     std::tie(ox, state) = decodeStep(encoded, y, state);
     max(maxValues, maxIdx, ox.array());
     maxIdx.host(&pred);
 
     if (pred == eos_) {
-      if (inc_eos){
+      if (inc_eos) {
         path.push_back(pred);
       }
       break;
@@ -279,13 +289,13 @@ af::array EncDecCriterionMulti::viterbiCheat(
 
   int maxDecode = std::min(maxDecoderOutputLen_, (int)cleanTarget.dims(0));
   for (int u = 0; u < maxDecode; u++) {
-    //ox = decodeStep(Variable(encoded, false), y);
+    // ox = decodeStep(Variable(encoded, false), y);
     std::tie(ox, state) = decodeStep(encoded, y, state);
     max(maxValues, maxIdx, ox.array());
     maxIdx.host(&pred);
 
     if (pred == eos_) {
-      if (inc_eos){
+      if (inc_eos) {
         path.push_back(pred);
       }
       break;
@@ -306,7 +316,6 @@ std::pair<Variable, EDState> EncDecCriterionMulti::decodeStep(
     const std::vector<Variable>& encoded,
     const Variable& y,
     const EDState& inState) const {
-
   Variable hy;
   if (y.isempty()) {
     hy = tile(startEmbedding(), {1, 1, encoded[0].dims(2)});
@@ -314,14 +323,14 @@ std::pair<Variable, EDState> EncDecCriterionMulti::decodeStep(
     hy = embedding()->forward(y);
   }
 
-  if (!posEmbEveryLayer_){
+  if (!posEmbEveryLayer_) {
     hy = applyPosEmb(hy, inState.step);
   }
-  
+
   EDState outState;
   outState.step = inState.step + 1;
   for (int i = 0; i < nLayerDec_; i++) {
-    if (posEmbEveryLayer_){
+    if (posEmbEveryLayer_) {
       hy = applyPosEmb(hy, inState.step);
     }
     if (inState.step == 0) {
@@ -338,10 +347,6 @@ std::pair<Variable, EDState> EncDecCriterionMulti::decodeStep(
   return std::make_pair(out, outState);
 }
 
-
-
-
-
 std::vector<int> EncDecCriterionMulti::beamPath(
     const std::vector<Variable>& encoded,
     int beamSize /* = 10 */,
@@ -349,26 +354,29 @@ std::vector<int> EncDecCriterionMulti::beamPath(
   std::vector<EncDecCriterionMulti::CandidateHypo> beam;
   auto ini_state = EDState(nLayerDec_);
   auto ini_candidate = CandidateHypo(0, {}, ini_state);
- // beam.emplace_back(CandidateHypo{});
+  // beam.emplace_back(CandidateHypo{});
   beam.emplace_back(ini_candidate);
-  auto beamPaths = beamSearch(encoded, beam, beamSize, maxDecoderOutputLen_, eos_score);
+  auto beamPaths =
+      beamSearch(encoded, beam, beamSize, maxDecoderOutputLen_, eos_score);
   return beamPaths[0].path;
 }
 
-std::vector<EncDecCriterionMulti::CandidateHypo> EncDecCriterionMulti::beamSearchRes(
+std::vector<EncDecCriterionMulti::CandidateHypo>
+EncDecCriterionMulti::beamSearchRes(
     const std::vector<Variable>& encoded,
     int beamSize /* = 10 */,
     float eos_score) {
   std::vector<EncDecCriterionMulti::CandidateHypo> beam;
   auto ini_state = EDState(nLayerDec_);
   auto ini_candidate = CandidateHypo(0, {}, ini_state);
- // beam.emplace_back(CandidateHypo{});
+  // beam.emplace_back(CandidateHypo{});
   beam.emplace_back(ini_candidate);
   return beamSearch(encoded, beam, beamSize, maxDecoderOutputLen_, eos_score);
 }
 
 // beam are candidates that need to be extended
-std::vector<EncDecCriterionMulti::CandidateHypo> EncDecCriterionMulti::beamSearch(
+std::vector<EncDecCriterionMulti::CandidateHypo>
+EncDecCriterionMulti::beamSearch(
     const std::vector<Variable>& encoded, // H x T x 1
     std::vector<EncDecCriterionMulti::CandidateHypo> beam,
     int beamSize = 10,
@@ -385,37 +393,40 @@ std::vector<EncDecCriterionMulti::CandidateHypo> EncDecCriterionMulti::beamSearc
   };
 
   for (int l = 0; l < maxLen; l++) {
-    //std::cout << "l= " << l << std::endl;
+    // std::cout << "l= " << l << std::endl;
     newBeam.resize(0);
 
     std::vector<Variable> prevYVec;
     std::vector<EDState> prevStateVec;
     std::vector<float> prevScoreVec;
-    //int j=0;
+    // int j=0;
     for (auto& hypo : beam) {
       //++j;
-      //std::cout << "state num: " << j << std::endl;
+      // std::cout << "state num: " << j << std::endl;
       Variable y;
       if (!hypo.path.empty()) {
         y = constant(hypo.path.back(), 1, s32, false);
       }
       prevYVec.push_back(y);
-      //af::print("push y: ", y.array());
+      // af::print("push y: ", y.array());
       prevStateVec.push_back(hypo.state);
-      //af::print("push state: ", hypo.state.array());
+      // af::print("push state: ", hypo.state.array());
       prevScoreVec.push_back(hypo.score);
     }
     auto prevY = concatenate(prevYVec, 1); // 1 x B
-    //af::print("prevY: ", prevY.array());
-    //std::cout << "call concatState " << std::endl;
+    // af::print("prevY: ", prevY.array());
+    // std::cout << "call concatState " << std::endl;
     auto prevState = detailMulti::concatState(prevStateVec);
 
     Variable ox;
     EDState state;
-    //std::tie(ox, state) = decodeStep(Variable(input, false), prevY, prevState);
-    std::tie(ox, state) = decodeStep({tile(encoded[0], {1, 1, static_cast<int>(beam.size())}), 
-                                      tile(encoded[1], {1, 1, static_cast<int>(beam.size())})},
-                                     prevY, prevState);
+    // std::tie(ox, state) = decodeStep(Variable(input, false), prevY,
+    // prevState);
+    std::tie(ox, state) = decodeStep(
+        {tile(encoded[0], {1, 1, static_cast<int>(beam.size())}),
+         tile(encoded[1], {1, 1, static_cast<int>(beam.size())})},
+        prevY,
+        prevState);
     ox = logSoftmax(ox, 0); // C x 1 x B
     ox = fl::reorder(ox, 0, 2, 1);
 
@@ -445,12 +456,16 @@ std::vector<EncDecCriterionMulti::CandidateHypo> EncDecCriterionMulti::beamSearc
       std::vector<int> path_(beam[hypIdx].path);
       path_.push_back(clsIdx);
       if (j < beamSize && clsIdx == eos_) {
-        //path_.pop_back();
+        // path_.pop_back();
         complete.emplace_back(
-            scoreVec[indices[j]] + eos_score, path_, detailMulti::selectState(state, hypIdx));
+            scoreVec[indices[j]] + eos_score,
+            path_,
+            detailMulti::selectState(state, hypIdx));
       } else if (clsIdx != eos_) {
         newBeam.emplace_back(
-            scoreVec[indices[j]], path_, detailMulti::selectState(state, hypIdx));
+            scoreVec[indices[j]],
+            path_,
+            detailMulti::selectState(state, hypIdx));
       }
       if (newBeam.size() >= beamSize) {
         break;
@@ -479,14 +494,6 @@ std::vector<EncDecCriterionMulti::CandidateHypo> EncDecCriterionMulti::beamSearc
 
   return complete.empty() ? beam : complete;
 }
-
-
-
-
-
-
-
-
 
 /*
 std::pair<std::vector<std::vector<float>>, std::vector<TS2SStatePtr>>

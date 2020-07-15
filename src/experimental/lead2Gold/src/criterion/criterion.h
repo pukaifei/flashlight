@@ -16,5 +16,5 @@
 //#include "criterion/FullConnectionCriterion.h"
 //#include "criterion/LinearSegmentationCriterion.h"
 //#include "criterion/Seq2SeqCriterion.h"
-#include "experimental/lead2Gold/src/criterion/l2g/Lead2Gold.h"
 #include "criterion/criterion.h"
+#include "experimental/lead2Gold/src/criterion/l2g/Lead2Gold.h"

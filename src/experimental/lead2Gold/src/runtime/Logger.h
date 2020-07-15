@@ -15,28 +15,24 @@
 
 #include <flashlight/flashlight.h>
 
-
-
 #include "runtime/SpeechStatMeter.h"
 
-
+#include "experimental/lead2Gold/src/common/Defines.h"
 #include "experimental/lead2Gold/src/criterion/criterion.h"
 #include "runtime/Logger.h"
-#include "experimental/lead2Gold/src/common/Defines.h"
-
 
 #define LOG_MASTER(lvl) LOG_IF(lvl, (fl::getWorldRank() == 0))
 
 namespace w2l {
 
-//For Train.cpp
+// For Train.cpp
 struct NoiseDatasetMeters {
   fl::EditDistanceMeter tknEdit, wrdEdit;
   fl::AverageValueMeter loss;
   fl::AverageValueMeter wLER;
 };
 
-//For Train.cpp
+// For Train.cpp
 struct NoiseTrainMeters {
   fl::TimeMeter runtime;
   fl::TimeMeter timer{true};
@@ -57,21 +53,18 @@ struct SSLDatasetMeters {
   std::map<std::string, fl::AverageValueMeter> losses;
 
   SSLDatasetMeters()
-      : edits({ {kTarget, fl::EditDistanceMeter()},
-                {kWord, fl::EditDistanceMeter()}
-              }),
-        losses({ {kASRPaired, fl::AverageValueMeter()},
-                 {kASRUnpaired, fl::AverageValueMeter()}     
-              }) {}             
+      : edits({{kTarget, fl::EditDistanceMeter()},
+               {kWord, fl::EditDistanceMeter()}}),
+        losses({{kASRPaired, fl::AverageValueMeter()},
+                {kASRUnpaired, fl::AverageValueMeter()}}) {}
 };
 
 struct NoiselmMeters {
   std::map<std::string, fl::AverageValueMeter> losses;
 
   NoiselmMeters()
-      : losses({ {klossScale, fl::AverageValueMeter()},
-                 {klossNoiselm, fl::AverageValueMeter()}
-                      }) {}           
+      : losses({{klossScale, fl::AverageValueMeter()},
+                {klossNoiselm, fl::AverageValueMeter()}}) {}
 };
 
 struct SSLTrainMeters {
@@ -98,7 +91,7 @@ struct SSLTrainMeters {
                {kOptimTimer, fl::TimeMeter(true)}}) {}
 };
 
-//For Train.cpp
+// For Train.cpp
 std::pair<std::string, std::string> getStatus(
     NoiseTrainMeters& meters,
     int64_t epoch,
@@ -165,7 +158,6 @@ class LogHelper {
   LogHelper() {}
 };
 
-
 template <>
 void syncMeter<SSLTrainMeters>(SSLTrainMeters& meters);
 
@@ -175,7 +167,6 @@ void syncMeter<SSLDatasetMeters>(SSLDatasetMeters& meters);
 template <>
 void syncMeter<NoiselmMeters>(NoiselmMeters& meters);
 
-
 void resetTimeStatMeters(SSLTrainMeters& meters);
 
 void stopTimeMeters(SSLTrainMeters& meters);
@@ -184,7 +175,7 @@ void resetDatasetMeters(SSLDatasetMeters& meters);
 
 void resetNoiselmMeters(NoiselmMeters& meters);
 
-//for Train.cpp
+// for Train.cpp
 template <>
 void syncMeter<NoiseTrainMeters>(NoiseTrainMeters& mtrs);
 

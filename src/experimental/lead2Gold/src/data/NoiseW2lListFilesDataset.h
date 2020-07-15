@@ -9,9 +9,9 @@
 #pragma once
 
 #include "common/FlashlightUtils.h"
-#include "experimental/lead2Gold/src/data/Utils.h"
 #include "data/W2lDataset.h"
 #include "experimental/lead2Gold/src/data/Featurize.h"
+#include "experimental/lead2Gold/src/data/Utils.h"
 
 namespace w2l {
 
@@ -42,7 +42,10 @@ class NoiseW2lListFilesDataset : public W2lDataset {
   W2lFeatureData getFeatureDataAndPrefetch(const int64_t idx) const;
 
   void eraseTargets(const int64_t idx);
-  void updateTargets(const int64_t idx, const std::vector<std::vector<std::string>>& newTranscriptions, bool toGroundTruth = false);
+  void updateTargets(
+      const int64_t idx,
+      const std::vector<std::vector<std::string>>& newTranscriptions,
+      bool toGroundTruth = false);
   void copyToGroundTruthTranscript(const int64_t idx);
 
  private:
