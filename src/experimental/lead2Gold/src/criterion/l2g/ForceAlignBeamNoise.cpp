@@ -690,7 +690,7 @@ fl::Variable ForceAlignBeamNoise::forward(
     //}
     // finish
     //-1e220 -> we assign a probability even if the beam failed. To change,
-    //maybe it causes a bug ForceAlignBeamNoiseNode fini(-1, -1e200, -1, -1,
+    // maybe it causes a bug ForceAlignBeamNoiseNode fini(-1, -1e200, -1, -1,
     // nullptr, nullptr, nullptr, -1);
     ForceAlignBeamNoiseNode fini("fini");
     for (ForceAlignBeamNoiseNode& prev : hyps.at(T)) {

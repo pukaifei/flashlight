@@ -149,7 +149,7 @@ fl::Variable CtcForceAlignBeamNoise::forward(
 
       // std::vector<std::vector<CtcForceAlignBeamNoiseNode>>
       // newhypsNested(hyps.at(t).size()); #pragma omp parallel for
-      //num_threads(Nb_nested_)
+      // num_threads(Nb_nested_)
       for (auto& prev : hyps.at(t)) {
         // for(int prev_idx = 0;  prev_idx < hyps[t].size() ; prev_idx++) {
         // CtcForceAlignBeamNoiseNode& prev = hyps[t][prev_idx];
@@ -207,8 +207,8 @@ fl::Variable CtcForceAlignBeamNoise::forward(
           // std::cout << tok << " <- " << tokenDict_.getEntry(tok) <<
           // std::endl; std::cout <<
           // tokenDict_.getEntry(noisytarget_p[prev.noisytarget_t]) << " " <<
-          // tokenDict_.getEntry(noisytarget_p[prev.noisytarget_t + 1]) << " " <<
-          // tokenDict_.getEntry(noisytarget_p[prev.noisytarget_t + 2]) <<
+          // tokenDict_.getEntry(noisytarget_p[prev.noisytarget_t + 1]) << " "
+          // << tokenDict_.getEntry(noisytarget_p[prev.noisytarget_t + 2]) <<
           // std::endl;
 
           // tok = (i == tokenDict_.getIndex("1")) ? prev.tok : i;

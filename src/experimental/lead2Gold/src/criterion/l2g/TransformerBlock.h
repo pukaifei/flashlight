@@ -31,8 +31,8 @@ class TransformerBlock : public fl::Container {
       bool usePosEmb);
 
   // if input is of size 2. First element is the past and we ask to forward the
-  // 2nd element. if input is of size 1. We compute every possibility. encoded is
-  // a sequence CxTxBx1 on which to attend.
+  // 2nd element. if input is of size 1. We compute every possibility. encoded
+  // is a sequence CxTxBx1 on which to attend.
   std::vector<fl::Variable> forward(
       const std::vector<fl::Variable>& input,
       const std::vector<fl::Variable>& encoded);

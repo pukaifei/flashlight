@@ -305,10 +305,10 @@ fl::Variable ForceAlignBeamNoiseStats::forward(
                   // newhyps.push_back({i, baseScore, prev.noisytarget_t,
                   // prev.knoisytarget_t, &prev, prev.letter, key, noiselmstate,
                   // prev.nb_subs, prev.nb_ins, prev.nb_del}); std::cout <<
-                  // "same" << std::endl; ForceAlignBeamNoiseNodeStats& newnode =
-                  // newhyps[idx_nhyp]; newnode.set(i, baseScore,
-                  // prev.noisytarget_t, prev.knoisytarget_t, &prev, prev.letter,
-                  // key, noiselmstate, t+1); idx_nhyp++;
+                  // "same" << std::endl; ForceAlignBeamNoiseNodeStats& newnode
+                  // = newhyps[idx_nhyp]; newnode.set(i, baseScore,
+                  // prev.noisytarget_t, prev.knoisytarget_t, &prev,
+                  // prev.letter, key, noiselmstate, t+1); idx_nhyp++;
                   newhyps.emplace_back(
                       i,
                       baseScore,
@@ -620,7 +620,7 @@ fl::Variable ForceAlignBeamNoiseStats::forward(
     //}
     // finish
     //-1e220 -> we assign a probability even if the beam failed. To change,
-    //maybe it causes a bug ForceAlignBeamNoiseNode fini(-1, -1e200, -1, -1,
+    // maybe it causes a bug ForceAlignBeamNoiseNode fini(-1, -1e200, -1, -1,
     // nullptr, nullptr, nullptr, -1);
     ForceAlignBeamNoiseNodeStats fini("fini");
     for (ForceAlignBeamNoiseNodeStats& prev : hyps.at(T)) {

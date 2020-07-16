@@ -39,8 +39,8 @@ std::vector<fl::Variable> AnalyseBeam::forward(
   // print things
   // std::cout << "N = " << N << " T = " << T << " B = " << B << " L = " << mS
   // << std::endl; std::cout << "emissions" << std::endl; for(int b = 0; b < B ;
-  // b++){ for(int t = 0; t < T ; t++){ for(int n = 0; n < N ; n++){ std::cout <<
-  // std::to_string(emissions(n,t,b).scalar<float>()) << ",";
+  // b++){ for(int t = 0; t < T ; t++){ for(int n = 0; n < N ; n++){ std::cout
+  // << std::to_string(emissions(n,t,b).scalar<float>()) << ",";
   //}
   //}
   //}
