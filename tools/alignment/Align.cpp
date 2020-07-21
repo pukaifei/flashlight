@@ -14,7 +14,7 @@
 #include "module/module.h"
 #include "runtime/runtime.h"
 
-#include "alignment/Utils.h"
+#include "tools/alignment/Utils.h"
 
 using namespace w2l;
 using namespace w2l::alignment;
@@ -126,7 +126,7 @@ int main(int argc, char** argv) {
 
   LOG(INFO) << "[Dataset] Dataset loaded";
 
-  auto postprocess_fn = getWordSegmenter(criterion);
+  auto postprocessFN = getWordSegmenter(criterion);
 
   int batches = 0;
   fl::TimeMeter alignMtr;
@@ -162,8 +162,8 @@ int main(int argc, char** argv) {
     for (int b = 0; b < tokenPaths.size(); b++) {
       if (sampleIdsStr.size() > b) {
         const std::vector<std::string>& path = tokenPaths[b];
-        const std::vector<AlignedWord> segmentation =
-            postprocess_fn(path, FLAGS_replabel, msPerFrame * timeScale);
+        const std::vector<AlignedWord> segmentation = postprocessFN(
+            path, FLAGS_replabel, FLAGS_framestridems * timeScale);
         const std::string ctmString = getCTMFormat(segmentation);
         std::stringstream buffer;
         buffer << sampleIdsStr[b] << "\t" << ctmString << "\n";

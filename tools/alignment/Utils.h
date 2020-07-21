@@ -1,3 +1,11 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
 #include <codecvt>
 #include <locale>
 #include "common/FlashlightUtils.h"
@@ -5,8 +13,6 @@
 namespace w2l {
 
 namespace alignment {
-
-constexpr double msPerFrame = 10;
 
 struct AlignedWord {
   std::string word;
