@@ -201,7 +201,8 @@ TEST(FreeList, TooManyAllocs) {
       10,
       kAllocatedRatioJitThreshold,
       kLogLevel);
-  EXPECT_THROW(while (true) { allocator.allocate(1); }, std::invalid_argument);
+  EXPECT_THROW(
+      while (true) { allocator.allocate(1); }, std::invalid_argument);
 }
 
 TEST(FreeList, AllocTooBig) {
