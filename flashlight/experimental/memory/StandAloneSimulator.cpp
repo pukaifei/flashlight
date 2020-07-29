@@ -117,10 +117,10 @@ void simulate(
   std::sort(sortedIndices.begin(), sortedIndices.end(), comparator);
 
   std::stringstream summary;
-  summary
-      << "success,elapsed(sec),allocationsCount,maxExternalFragmentationScore,performanceCost,"
-      << "maxInternalFragmentationScore,allocatorConfigFile,resultFileName"
-      << std::endl;
+  summary << "success,elapsed(sec),allocationsCount,"
+             "maxExternalFragmentationScore,performanceCost,"
+          << "maxInternalFragmentationScore,allocatorConfigFile,resultFileName"
+          << std::endl;
   LOG(INFO) << "  memoryAllocatorConfigPathVector.size()="
             << memoryAllocatorConfigPathVector.size();
 
@@ -180,7 +180,8 @@ int main(int argc, char** argv) {
     LOG(ERROR)
         << "Usage:" << argv[0]
         << " [arenasize] [path to allocation log csv file] "
-        << "[path to memory config json file 1] ..  [path to memory config json file n]"
+        << "[path to memory config json file 1] ..  [path to memory config "
+           "json file n]"
         << "\narenasize: use 16523001856 (15GB+397MB+576KB) for 16GB machines";
     return -1;
   }

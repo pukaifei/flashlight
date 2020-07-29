@@ -524,35 +524,39 @@ orderMemoryAllocatorConfigByLoss(
     const MemoryAllocatorConfiguration& allocatorConfig = haystack[i2];
     MemoryAllocatorConfigurationLossOrdering* haystackOrder =
         &haystackOrderVec.at(i2);
-    threadPool.enqueue([&allocationLog,
-                        &allocatorConfig,
-                        haystackOrder,
-                        &optimizerConfig,
-                        arenaAddress]() {
-      std::unique_ptr<MemoryAllocator> allocator = CreateMemoryAllocator(
-          allocatorConfig, arenaAddress, optimizerConfig.memorySize, logLevel);
+    threadPool.enqueue(
+        [&allocationLog,
+         &allocatorConfig,
+         haystackOrder,
+         &optimizerConfig,
+         arenaAddress]() {
+          std::unique_ptr<MemoryAllocator> allocator = CreateMemoryAllocator(
+              allocatorConfig,
+              arenaAddress,
+              optimizerConfig.memorySize,
+              logLevel);
 
-      size_t arenaSize = allocator->getStats().statsInBlocks.arenaSize;
+          size_t arenaSize = allocator->getStats().statsInBlocks.arenaSize;
 
-      if (arenaSize < 10) {
-        LOG(ERROR) << "INVALID allocator!!!=" << allocator->prettyString();
-        return;
-      }
+          if (arenaSize < 10) {
+            LOG(ERROR) << "INVALID allocator!!!=" << allocator->prettyString();
+            return;
+          }
 
-      bool success =
-          simulateAllocatorOnAllocationLog(allocationLog, allocator.get());
-      if (!success) {
-        LOG(ERROR)
-            << "Failed orderMemoryAllocatorConfigByLoss() haystackOrder->index="
-            << haystackOrder->index;
-        return;
-      }
-      haystackOrder->stats =
-          fl::cpp::make_unique<MemoryAllocator::Stats>(allocator->getStats());
-      haystackOrder->loss = memoryAllocatorStatsLossFunction(
-          true, *haystackOrder->stats, 0, 0, optimizerConfig);
-      haystackOrder->completedWithSuccess = true;
-    });
+          bool success =
+              simulateAllocatorOnAllocationLog(allocationLog, allocator.get());
+          if (!success) {
+            LOG(ERROR)
+                << "Failed orderMemoryAllocatorConfigByLoss() haystackOrder->index="
+                << haystackOrder->index;
+            return;
+          }
+          haystackOrder->stats = fl::cpp::make_unique<MemoryAllocator::Stats>(
+              allocator->getStats());
+          haystackOrder->loss = memoryAllocatorStatsLossFunction(
+              true, *haystackOrder->stats, 0, 0, optimizerConfig);
+          haystackOrder->completedWithSuccess = true;
+        });
   }
   threadPool.blockUntilAlldone();
 
