@@ -7,14 +7,14 @@ add_library(
 
 set(
   MEMORY_MANAGER_SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/flashlight/experimental/memory/AllocationLog.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/flashlight/experimental/memory/allocator/CompositeMemoryAllocator.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/flashlight/experimental/memory/allocator/ConfigurableMemoryAllocator.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/flashlight/experimental/memory/allocator/MemoryAllocator.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/flashlight/experimental/memory/allocator/freelist/FreeList.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/flashlight/experimental/memory/allocator/memorypool/MemoryPool.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/flashlight/experimental/memory/optimizer/Optimizer.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/flashlight/experimental/memory/optimizer/Simulator.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/AllocationLog.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/allocator/CompositeMemoryAllocator.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/allocator/ConfigurableMemoryAllocator.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/allocator/MemoryAllocator.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/allocator/freelist/FreeList.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/allocator/memorypool/MemoryPool.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/optimizer/Optimizer.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/optimizer/Simulator.cpp
 )
 
 target_sources(
@@ -30,7 +30,7 @@ target_link_libraries(
 )
 
 add_executable(allocation_log_analyser
-  ${CMAKE_CURRENT_SOURCE_DIR}/flashlight/experimental/memory/AllocationLogAnalyser.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/AllocationLogAnalyser.cpp
   )
 
 target_link_libraries(
@@ -47,7 +47,7 @@ target_include_directories(
   )
 
 add_executable(stand_alone_simulator
-  ${CMAKE_CURRENT_SOURCE_DIR}/flashlight/experimental/memory/StandAloneSimulator.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/StandAloneSimulator.cpp
 )
 
 target_link_libraries(
@@ -65,7 +65,7 @@ target_include_directories(
 
 
 add_executable(stand_alone_optimizer
-  ${CMAKE_CURRENT_SOURCE_DIR}/flashlight/experimental/memory/StandAloneOptimizer.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/StandAloneOptimizer.cpp
   )
 
 target_link_libraries(
