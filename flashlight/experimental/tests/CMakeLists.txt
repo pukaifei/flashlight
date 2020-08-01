@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.5.1)
 
-set(DIR ${CMAKE_CURRENT_SOURCE_DIR})
-set(LIBS flashlight experimental_memory) # TODO: what is experimental_memory?? nuke it
+set(DIR ${CMAKE_CURRENT_LIST_DIR})
+set(LIBS flashlight)
 
 if (FL_BUILD_TESTS)
-  build_test(${DIR}/experimental/tests/FreeListTest.cpp ${LIBS} "")
-  build_test(${DIR}/experimental/tests/MemoryPoolTest.cpp ${LIBS} "")
-  build_test(${DIR}/experimental/tests/CompositeMemoryAllocatorTest.cpp ${LIBS} "")
-  build_test(${DIR}/experimental/tests/ConfigurableMemoryAllocatorTest.cpp ${LIBS} "")
+  build_test(${DIR}/FreeListTest.cpp ${LIBS} "")
+  build_test(${DIR}/MemoryPoolTest.cpp ${LIBS} "")
+  build_test(${DIR}/CompositeMemoryAllocatorTest.cpp ${LIBS} "")
+  build_test(${DIR}/ConfigurableMemoryAllocatorTest.cpp ${LIBS} "")
 endif ()

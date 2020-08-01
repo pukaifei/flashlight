@@ -1,82 +1,33 @@
 cmake_minimum_required(VERSION 3.5.1)
 
-add_library(
-  experimental_memory
-  INTERFACE
-)
-
 set(
   MEMORY_MANAGER_SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/AllocationLog.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/allocator/CompositeMemoryAllocator.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/allocator/ConfigurableMemoryAllocator.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/allocator/MemoryAllocator.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/allocator/freelist/FreeList.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/allocator/memorypool/MemoryPool.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/optimizer/Optimizer.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/optimizer/Simulator.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/AllocationLog.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/allocator/CompositeMemoryAllocator.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/allocator/ConfigurableMemoryAllocator.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/allocator/MemoryAllocator.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/allocator/freelist/FreeList.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/allocator/memorypool/MemoryPool.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/optimizer/Optimizer.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/optimizer/Simulator.cpp
 )
 
 target_sources(
-  experimental_memory
-  INTERFACE
+  flashlight
+  PUBLIC
   $<BUILD_INTERFACE:${MEMORY_MANAGER_SOURCES}>
 )
 
-target_link_libraries(
-  experimental_memory
-  INTERFACE
-  Common
-)
-
 add_executable(allocation_log_analyser
-  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/AllocationLogAnalyser.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/AllocationLogAnalyser.cpp
   )
-
-target_link_libraries(
-  allocation_log_analyser
-  PRIVATE
-  experimental_memory
-  flashlight
-  )
-
-target_include_directories(
-  allocation_log_analyser
-  PRIVATE
-  ${CMAKE_SOURCE_DIR}
-  )
-
 add_executable(stand_alone_simulator
-  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/StandAloneSimulator.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/StandAloneSimulator.cpp
 )
-
-target_link_libraries(
-  stand_alone_simulator
-  PRIVATE
-  experimental_memory
-  flashlight
-  )
-
-target_include_directories(
-  stand_alone_simulator
-  PRIVATE
-  ${CMAKE_SOURCE_DIR}
-  )
-
-
 add_executable(stand_alone_optimizer
-  ${CMAKE_CURRENT_SOURCE_DIR}/experimental/memory/StandAloneOptimizer.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/StandAloneOptimizer.cpp
   )
 
-target_link_libraries(
-  stand_alone_optimizer
-  PRIVATE
-  experimental_memory
-  flashlight
-  )
-
-target_include_directories(
-  stand_alone_optimizer
-  PRIVATE
-  ${CMAKE_SOURCE_DIR}
-  )
+target_link_libraries(allocation_log_analyser flashlight)
+target_link_libraries(stand_alone_simulator flashlight)
+target_link_libraries(stand_alone_optimizer flashlight)
