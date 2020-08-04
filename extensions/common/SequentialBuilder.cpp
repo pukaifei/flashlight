@@ -6,12 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "extensions/common/SequentialBuilder.h"
+#include "flashlight/extensions/common/SequentialBuilder.h"
 
 #include <stdexcept>
 
-#include "libraries/common/String.h"
-#include "libraries/common/System.h"
+#include "flashlight/libraries/common/String.h"
+#include "flashlight/libraries/common/System.h"
 
 using namespace fl;
 using namespace fl::lib;

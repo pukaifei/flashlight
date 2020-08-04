@@ -6,15 +6,15 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <gmock/gmock.h>
 #include <future>
 #include <mutex>
 #include <string>
 #include <vector>
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "libraries/common/ProducerConsumerQueue.h"
+#include "flashlight/libraries/common/ProducerConsumerQueue.h"
 
 using namespace fl::lib;
 

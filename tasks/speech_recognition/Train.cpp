@@ -24,11 +24,11 @@
 #include "decoder/Utils.h"
 #include "runtime/runtime.h"
 
-#include "extensions/common/SequentialBuilder.h"
-#include "extensions/common/Utils.h"
-#include "libraries/common/System.h"
-#include "libraries/language/dictionary/Dictionary.h"
-#include "libraries/language/dictionary/Utils.h"
+#include "flashlight/extensions/common/SequentialBuilder.h"
+#include "flashlight/extensions/common/Utils.h"
+#include "flashlight/libraries/common/System.h"
+#include "flashlight/libraries/language/dictionary/Dictionary.h"
+#include "flashlight/libraries/language/dictionary/Utils.h"
 
 using namespace fl::ext;
 using namespace fl::lib;

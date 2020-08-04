@@ -1,20 +1,13 @@
 cmake_minimum_required(VERSION 3.5.1)
 
-project(flashlight_task_asr)
-
-# ----------------------------- Configuration -----------------------------
-
-option(FL_LIBRARIES_USE_CUDA "Use CUDA in libraries-only build" ON)
-option(FL_LIBRARIES_USE_KENLM "Use KenLM in libraries-only build" ON)
-option(FL_LIBRARIES_USE_MKL "Use MKL in libraries-only build" ON)
-option(FL_BUILD_FOR_PYTHON "Build Python bindings" OFF)
-option(FL_BUILD_TESTS "Build tests for wav2letter++" ON)
-option(FL_BUILD_EXAMPLES "Build examples for wav2letter++" ON)
-option(FL_BUILD_EXPERIMENTAL "Build internal experimental components for wav2letter++" OFF)
-option(FL_BUILD_SCRIPTS "Build internal scripts for wav2letter++" OFF)
-option(FL_BUILD_RECIPES "Build recipes" ON)
-option(FL_BUILD_TOOLS "Build audio tools" OFF)
-set(KENLM_MAX_ORDER 6 CACHE STRING "Maximum ngram order for KenLM")
+# ------------------------- Library -------------------------
+# TODO(jacobkahn): Task libraries aren't currently installed.
+# Having them bundled into flashlight and moving headers accordingly is
+# one potential path forward here.
+add_library(
+  flashlight-task-speech-recognition
+  ""
+  )
 
 # ------------------------- Dependency Fallback -------------------------
 
@@ -27,6 +20,8 @@ if (FL_LIBRARIES_USE_MKL)
 endif ()
 
 # ------------------------ Global External Dependencies ------------------------
+# TODO(jacobkahn): add gating for Conan glog and gflags packages
+
 # Find GLog
 find_package(GLOG REQUIRED)
 if (GLOG_FOUND)
@@ -56,99 +51,56 @@ else()
   message(STATUS "OpenMP not found - building without OpenMP")
 endif()
 
-# Find Flashlight
-find_library(flashlight REQUIRED HINTS "${CMAKE_BINARY_DIR}/flashlight")
-find_library(fl-extensions REQUIRED HINTS "${CMAKE_BINARY_DIR}/extensions")
-find_library(fl-libraries REQUIRED HINTS "${CMAKE_BINARY_DIR}/libraries")
+target_link_libraries(
+  flashlight-task-speech-recognition
+  PUBLIC
+  ${GFLAGS_LIBRARIES}
+  ${GLOG_LIBRARIES}
+  ${MKL_LIBRARIES}
+  flashlight
+  )
+
+
+target_include_directories(
+  flashlight-task-speech-recognition
+  PUBLIC
+  ${GFLAGS_INCLUDE_DIRS}
+  ${GLOG_INCLUDE_DIRS}
+  ${MKL_INCLUDE_DIR}
+  # some includes are relative to the asr root path
+  # TODO(jacobkahn): improve this...?
+  $<BUILD_INTERFACE:${FL_TASK_SPEECH_RECOGNITION_ROOT_DIR}>
+  )
 
 # ------------------------ Components ------------------------
 
 # Common
-add_subdirectory(${PROJECT_SOURCE_DIR}/common)
+include(${CMAKE_CURRENT_LIST_DIR}/common/CMakeLists.txt)
 
 # Criterion
-add_subdirectory(${PROJECT_SOURCE_DIR}/criterion)
+include(${CMAKE_CURRENT_LIST_DIR}/criterion/CMakeLists.txt)
 
 # Data
-add_subdirectory(${PROJECT_SOURCE_DIR}/data)
+include(${CMAKE_CURRENT_LIST_DIR}/data/CMakeLists.txt)
 
 # Decoder
-add_subdirectory(${PROJECT_SOURCE_DIR}/decoder)
+include(${CMAKE_CURRENT_LIST_DIR}/decoder/CMakeLists.txt)
 
 # Runtime
-add_subdirectory(${PROJECT_SOURCE_DIR}/runtime)
+include(${CMAKE_CURRENT_LIST_DIR}/runtime/CMakeLists.txt)
 
-# ----------------------------- task-asr lib  -----------------------------
+# ----------------------------- Binaries -----------------------------
+add_executable(Train ${CMAKE_CURRENT_LIST_DIR}/Train.cpp)
+add_executable(Test ${CMAKE_CURRENT_LIST_DIR}/Test.cpp)
+add_executable(Decoder ${CMAKE_CURRENT_LIST_DIR}/Decode.cpp)
 
-add_library(
-  task-asr
-  ""
-  )
-
-set_target_properties(
-  task-asr
-  PROPERTIES
-  LINKER_LANGUAGE CXX
-  CXX_STANDARD 11
-  )
-
-target_link_libraries(
-  task-asr
-  PUBLIC
-  asr-common
-  asr-criterion
-  asr-data
-  asr-decoder
-  asr-runtime
-  flashlight
-  fl-extensions
-  fl-libraries
-  )
-
-target_include_directories(
-  task-asr
-  PUBLIC
-  ${PROJECT_SOURCE_DIR} # all includes are based at 
-  )
-
-# ----------------------------- Train -----------------------------
-add_executable(
-  Train
-  Train.cpp
-)
-
-target_link_libraries(
-  Train
-  task-asr
-  )
-
-# ----------------------------- Test -----------------------------
-add_executable(
-  Test
-  Test.cpp
-  )
-
-target_link_libraries(
-  Test
-  task-asr
-  )
-
-# ----------------------------- Decoder -----------------------------
-add_executable(
-  Decoder
-  Decode.cpp
-  )
-
-target_link_libraries(
-  Decoder
-  task-asr
-  )
+target_link_libraries(Train flashlight-task-speech-recognition)
+target_link_libraries(Test flashlight-task-speech-recognition)
+target_link_libraries(Decoder flashlight-task-speech-recognition)
 
 # --------------------------- Tests ---------------------------
 
 # Build tests
-option(FL_BUILD_TESTS "Build tests for flashlight" ON)
 if (FL_BUILD_TESTS)
-  enable_testing()
-  add_subdirectory(${PROJECT_SOURCE_DIR}/tests)
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/tests)
 endif ()

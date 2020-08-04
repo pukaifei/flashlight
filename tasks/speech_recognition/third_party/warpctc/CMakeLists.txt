@@ -11,7 +11,10 @@ IF (NOT APPLE)
 ENDIF()
 
 IF (APPLE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O2")
+  # NOTE: setting -std this again causes nvcc to break, since this is already
+  # set in flashlight/cmake/CUDAUtils.cmake::set_cuda_cxx_compile_flags
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O2")
     add_definitions(-DAPPLE)
 ENDIF()
 
@@ -46,7 +49,9 @@ IF ((CUDA_VERSION VERSION_GREATER "9.0") OR (CUDA_VERSION VERSION_EQUAL "9.0"))
 ENDIF()
 
 if (NOT APPLE)
-    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} --std=c++11")
+  # NOTE: setting -std this again causes nvcc to break, since this is already
+  # set in flashlight/cmake/CUDAUtils.cmake::set_cuda_cxx_compile_flags
+    # set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} --std=c++11")
     set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -Xcompiler -fopenmp")
 ENDIF()
 
@@ -71,17 +76,21 @@ IF (WITH_GPU)
 
     MESSAGE(STATUS "warpctc: Building shared library with GPU support")
 
-    CUDA_ADD_LIBRARY(warpctc SHARED src/ctc_entrypoint.cu src/reduce.cu)
+    # CUDA_ADD_LIBRARY(warpctc SHARED src/ctc_entrypoint.cu src/reduce.cu)
+    set(warpctc_SOURCES
+      ${CMAKE_CURRENT_LIST_DIR}/src/ctc_entrypoint.cu
+      ${CMAKE_CURRENT_LIST_DIR}/src/reduce.cu PARENT_SCOPE)
     
-    TARGET_LINK_LIBRARIES(warpctc ${CUDA_curand_LIBRARY})
+    # TARGET_LINK_LIBRARIES(warpctc ${CUDA_curand_LIBRARY})
+    set(warpctc_LIBS ${CUDA_curand_LIBRARY} PARENT_SCOPE)
     
 
-    INSTALL(TARGETS warpctc
-            RUNTIME DESTINATION "bin"
-            LIBRARY DESTINATION "lib"
-            ARCHIVE DESTINATION "lib")
+    # INSTALL(TARGETS warpctc
+    #         RUNTIME DESTINATION "bin"
+    #         LIBRARY DESTINATION "lib"
+    #         ARCHIVE DESTINATION "lib")
 
-    INSTALL(FILES include/ctc.h DESTINATION "include")
+    # INSTALL(FILES include/ctc.h DESTINATION "include")
 
 ELSE()
     MESSAGE(STATUS "warpctc: Building shared library with no GPU support")
