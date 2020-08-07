@@ -14,10 +14,10 @@
 
 #include <flashlight/flashlight.h>
 
-#include "criterion/Defines.h"
+#include "flashlight/tasks/speech_recognition/criterion/Defines.h"
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 #define NEG_INFINITY_FLT -std::numeric_limits<float>::infinity()
@@ -107,5 +107,5 @@ inline af::array reorder(
   return moddims(result, result.dims());
 }
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

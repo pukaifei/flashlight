@@ -6,10 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "criterion/FullConnectionCriterion.h"
-#include "criterion/CriterionUtils.h"
+#include "flashlight/tasks/speech_recognition/criterion/FullConnectionCriterion.h"
+#include "flashlight/tasks/speech_recognition/criterion/CriterionUtils.h"
 
-#include "flashlight/extensions/common/Utils.h"
+#include "flashlight/extensions/common/DistributedUtils.h"
 #include "flashlight/libraries/sequence/criterion/cpu/FullConnectionCriterion.h"
 
 using fl::Variable;
@@ -24,7 +24,7 @@ struct Context {
 } // namespace
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 static void backward(
@@ -103,5 +103,5 @@ Variable FullConnectionCriterion::forward(
       });
 }
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

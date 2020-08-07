@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "common/Defines.h"
+#include "flashlight/tasks/speech_recognition/common/Defines.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -17,7 +17,7 @@
 using namespace fl::lib;
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 // DATA OPTIONS
@@ -420,5 +420,5 @@ void handleDeprecatedFlags() {
   }
 }
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

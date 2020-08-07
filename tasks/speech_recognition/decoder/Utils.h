@@ -16,13 +16,13 @@
 #include <string>
 #include <vector>
 
-#include "common/Defines.h"
+#include "flashlight/tasks/speech_recognition/common/Defines.h"
 #include "flashlight/libraries/common/String.h"
 #include "flashlight/libraries/language/dictionary/Dictionary.h"
 #include "flashlight/libraries/language/dictionary/Utils.h"
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 /* A series of vector to vector mapping operations */
@@ -79,5 +79,5 @@ void remapLabels(std::vector<T>& labels, const lib::Dictionary& dict) {
   }
 };
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

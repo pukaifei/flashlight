@@ -18,12 +18,12 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-#include "common/Defines.h"
-#include "criterion/criterion.h"
-#include "decoder/ConvLmModule.h"
-#include "decoder/Defines.h"
-#include "decoder/Utils.h"
-#include "runtime/runtime.h"
+#include "flashlight/tasks/speech_recognition/common/Defines.h"
+#include "flashlight/tasks/speech_recognition/criterion/criterion.h"
+#include "flashlight/tasks/speech_recognition/decoder/ConvLmModule.h"
+#include "flashlight/tasks/speech_recognition/decoder/Defines.h"
+#include "flashlight/tasks/speech_recognition/decoder/Utils.h"
+#include "flashlight/tasks/speech_recognition/runtime/runtime.h"
 
 #include "flashlight/libraries/common/ProducerConsumerQueue.h"
 #include "flashlight/libraries/language/decoder/LexiconDecoder.h"
@@ -36,7 +36,7 @@
 
 using namespace fl::ext;
 using namespace fl::lib;
-using namespace fl::task::asr;
+using namespace fl::tasks::asr;
 
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);

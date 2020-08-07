@@ -6,12 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "criterion/attention/LocationAttention.h"
+#include "flashlight/tasks/speech_recognition/criterion/attention/LocationAttention.h"
 
 using namespace fl;
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 SimpleLocationAttention::SimpleLocationAttention(int convKernel) {
@@ -173,5 +173,5 @@ std::string NeuralLocationAttention::prettyString() const {
   return "NeuralLocationBasedAttention";
 }
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

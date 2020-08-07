@@ -11,15 +11,15 @@
 #include <numeric>
 #include <sstream>
 
-#include "common/Defines.h"
-#include "data/BlobsDataset.h"
+#include "flashlight/tasks/speech_recognition/common/Defines.h"
+#include "flashlight/tasks/speech_recognition/data/BlobsDataset.h"
 #include "flashlight/libraries/common/String.h"
 #include "flashlight/libraries/common/System.h"
 
 using namespace fl::lib;
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 BlobsDataset::BlobsDataset(
@@ -133,5 +133,5 @@ std::vector<SpeechSampleMetaInfo> BlobsDataset::loadBlob(
   return samplesMetaInfo;
 }
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

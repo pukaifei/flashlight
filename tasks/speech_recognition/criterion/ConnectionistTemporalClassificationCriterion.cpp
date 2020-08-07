@@ -7,7 +7,7 @@
  */
 #include "ConnectionistTemporalClassificationCriterion.h"
 
-#include "flashlight/extensions/common/Utils.h"
+#include "flashlight/extensions/common/DistributedUtils.h"
 #include "flashlight/libraries/sequence/criterion/cpu/ConnectionistTemporalClassificationCriterion.h"
 
 using CTC = fl::lib::cpu::ConnectionistTemporalClassificationCriterion<float>;
@@ -42,7 +42,7 @@ af::array logSoftmax(const af::array& input, const int dim) {
 using namespace fl;
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 ConnectionistTemporalClassificationCriterion::
@@ -111,5 +111,5 @@ void ConnectionistTemporalClassificationCriterion::validate(
   }
 }
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

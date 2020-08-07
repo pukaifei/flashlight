@@ -10,17 +10,17 @@
 
 #include <memory>
 
-#include "criterion/Defines.h"
-#include "criterion/Seq2SeqCriterion.h"
-#include "criterion/SequenceCriterion.h"
-#include "criterion/attention/attention.h"
-#include "criterion/attention/window.h"
+#include "flashlight/tasks/speech_recognition/criterion/Defines.h"
+#include "flashlight/tasks/speech_recognition/criterion/Seq2SeqCriterion.h"
+#include "flashlight/tasks/speech_recognition/criterion/SequenceCriterion.h"
+#include "flashlight/tasks/speech_recognition/criterion/attention/attention.h"
+#include "flashlight/tasks/speech_recognition/criterion/attention/window.h"
 
-#include "flashlight/extensions/common/Utils.h"
+#include "flashlight/extensions/common/DistributedUtils.h"
 #include "flashlight/contrib/modules/Transformer.h"
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 struct TS2SState {
@@ -152,7 +152,7 @@ struct TS2SDecoderBuffer {
 AMUpdateFunc buildTransformerAmUpdateFunction(
     std::shared_ptr<SequenceCriterion>& crit);
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl
 
-CEREAL_REGISTER_TYPE(fl::task::asr::TransformerCriterion)
+CEREAL_REGISTER_TYPE(fl::tasks::asr::TransformerCriterion)

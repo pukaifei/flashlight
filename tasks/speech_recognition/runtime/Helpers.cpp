@@ -6,19 +6,19 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "runtime/Helpers.h"
+#include "flashlight/tasks/speech_recognition/runtime/Helpers.h"
 
 #include <glog/logging.h>
 #include <random>
 
-#include "flashlight/extensions/common/Utils.h"
+#include "flashlight/extensions/common/DistributedUtils.h"
 #include "flashlight/libraries/common/System.h"
 
 using namespace fl::ext;
 using namespace fl::lib;
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 template <class T>
@@ -166,5 +166,5 @@ std::shared_ptr<Dataset> createDataset(
   return ds;
 }
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

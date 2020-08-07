@@ -6,18 +6,18 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "criterion/ForceAlignmentCriterion.h"
+#include "flashlight/tasks/speech_recognition/criterion/ForceAlignmentCriterion.h"
 
 #include <flashlight/common/cuda.h>
 
-#include "criterion/CriterionUtils.h"
+#include "flashlight/tasks/speech_recognition/criterion/CriterionUtils.h"
 #include "flashlight/libraries/sequence/criterion/cuda/ForceAlignmentCriterion.cuh"
 
 using fl::Variable;
 using FAC = fl::lib::cuda::ForceAlignmentCriterion<float>;
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 static void backward(
@@ -167,5 +167,5 @@ af::array ForceAlignmentCriterion::viterbiPath(
   return bestPathsVar;
 }
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

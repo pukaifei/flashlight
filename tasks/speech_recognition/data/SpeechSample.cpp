@@ -6,10 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "data/SpeechSample.h"
+#include "flashlight/tasks/speech_recognition/data/SpeechSample.h"
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 std::vector<int64_t> sortSamples(
@@ -105,5 +105,5 @@ void filterSamples(
             << " samples";
 }
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

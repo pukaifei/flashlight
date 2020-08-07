@@ -6,14 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "criterion/attention/MultiHeadAttention.h"
+#include "flashlight/tasks/speech_recognition/criterion/attention/MultiHeadAttention.h"
 
 #include <cmath>
 
 using namespace fl;
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 MultiHeadContentAttention::MultiHeadContentAttention(
@@ -92,5 +92,5 @@ std::string MultiHeadContentAttention::prettyString() const {
   return "MultiHeadContentAttention";
 }
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

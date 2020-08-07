@@ -14,10 +14,10 @@
 #include <arrayfire.h>
 #include <array>
 
-#include "criterion/criterion.h"
+#include "flashlight/tasks/speech_recognition/criterion/criterion.h"
 
 using namespace fl;
-using namespace fl::task::asr;
+using namespace fl::tasks::asr;
 
 int main() {
   af::setDevice(1);

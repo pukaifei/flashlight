@@ -14,18 +14,18 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
-#include "criterion/criterion.h"
-#include "decoder/Defines.h"
-#include "decoder/Utils.h"
+#include "flashlight/tasks/speech_recognition/criterion/criterion.h"
+#include "flashlight/tasks/speech_recognition/decoder/Defines.h"
+#include "flashlight/tasks/speech_recognition/decoder/Utils.h"
 #include "flashlight/libraries/language/decoder/LexiconDecoder.h"
 #include "flashlight/libraries/language/decoder/Trie.h"
 #include "flashlight/libraries/language/decoder/lm/KenLM.h"
 #include "flashlight/libraries/language/dictionary/Dictionary.h"
-#include "runtime/runtime.h"
+#include "flashlight/tasks/speech_recognition/runtime/runtime.h"
 
 using namespace fl;
 using namespace fl::lib;
-using namespace fl::task::asr;
+using namespace fl::tasks::asr;
 
 /**
  * In this test, we check the output from LM, trie and decoder.

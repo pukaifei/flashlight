@@ -19,10 +19,10 @@
 
 #include <flashlight/flashlight.h>
 
-#include "criterion/AutoSegmentationCriterion.h"
+#include "flashlight/tasks/speech_recognition/criterion/AutoSegmentationCriterion.h"
 
 using namespace fl;
-using namespace fl::task::asr;
+using namespace fl::tasks::asr;
 
 namespace {
 

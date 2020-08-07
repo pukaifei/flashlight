@@ -14,12 +14,12 @@
 
 #include <glog/logging.h>
 
-#include "common/Defines.h"
+#include "flashlight/tasks/speech_recognition/common/Defines.h"
 
 using namespace fl::lib;
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 Dataset::Dataset(
@@ -173,5 +173,5 @@ std::vector<std::vector<int64_t>> RoundRobinBatchPacker::getBatches(
   return batches;
 }
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

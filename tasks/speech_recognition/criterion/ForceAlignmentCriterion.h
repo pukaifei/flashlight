@@ -10,11 +10,11 @@
 
 #include <flashlight/flashlight.h>
 
-#include "criterion/CriterionUtils.h"
-#include "criterion/Defines.h"
+#include "flashlight/tasks/speech_recognition/criterion/CriterionUtils.h"
+#include "flashlight/tasks/speech_recognition/criterion/Defines.h"
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 class ForceAlignmentCriterion : public fl::BinaryModule {
@@ -45,7 +45,7 @@ class ForceAlignmentCriterion : public fl::BinaryModule {
 
 typedef ForceAlignmentCriterion FACLoss;
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl
 
-CEREAL_REGISTER_TYPE(fl::task::asr::ForceAlignmentCriterion)
+CEREAL_REGISTER_TYPE(fl::tasks::asr::ForceAlignmentCriterion)

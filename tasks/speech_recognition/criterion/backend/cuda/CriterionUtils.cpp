@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "criterion/CriterionUtils.h"
+#include "flashlight/tasks/speech_recognition/criterion/CriterionUtils.h"
 
 #include <flashlight/common/cuda.h>
 
@@ -17,7 +17,7 @@ using CriterionUtils = fl::lib::cuda::CriterionUtils<float>;
 using ViterbiPath = fl::lib::cuda::ViterbiPath<float>;
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 af::array viterbiPath(const af::array& input, const af::array& trans) {
@@ -78,5 +78,5 @@ af::array getTargetSizeArray(const af::array& target, int maxSize) {
   return targetSize;
 }
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

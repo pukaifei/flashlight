@@ -6,12 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "runtime/Optimizer.h"
+#include "flashlight/tasks/speech_recognition/runtime/Optimizer.h"
 
 #include <glog/logging.h>
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 std::shared_ptr<fl::FirstOrderOptimizer> initOptimizer(
@@ -74,5 +74,5 @@ std::shared_ptr<fl::FirstOrderOptimizer> initOptimizer(
   return opt;
 }
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

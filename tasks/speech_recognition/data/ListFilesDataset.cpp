@@ -10,15 +10,15 @@
 #include <functional>
 #include <numeric>
 
-#include "common/Defines.h"
-#include "data/ListFilesDataset.h"
+#include "flashlight/tasks/speech_recognition/common/Defines.h"
+#include "flashlight/tasks/speech_recognition/data/ListFilesDataset.h"
 #include "flashlight/libraries/common/String.h"
 #include "flashlight/libraries/common/System.h"
 
 using namespace fl::lib;
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 ListFilesDataset::ListFilesDataset(
@@ -144,5 +144,5 @@ std::vector<SpeechSampleMetaInfo> ListFilesDataset::loadListFile(
   return samplesMetaInfo;
 }
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

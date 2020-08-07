@@ -8,12 +8,12 @@
 
 #pragma once
 
-#include "data/Dataset.h"
-#include "data/SpeechSample.h"
-#include "data/Utils.h"
+#include "flashlight/tasks/speech_recognition/data/Dataset.h"
+#include "flashlight/tasks/speech_recognition/data/SpeechSample.h"
+#include "flashlight/tasks/speech_recognition/data/Utils.h"
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 class ListFilesDataset : public Dataset {
@@ -45,5 +45,5 @@ class ListFilesDataset : public Dataset {
   std::vector<SpeechSampleMetaInfo> loadListFile(const std::string& filename);
 };
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

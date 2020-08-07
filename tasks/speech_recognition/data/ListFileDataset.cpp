@@ -2,7 +2,7 @@
 
 #include "ListFileDataset.h"
 
-#include "data/Sound.h"
+#include "flashlight/tasks/speech_recognition/data/Sound.h"
 
 #include "flashlight/libraries/common/String.h"
 
@@ -21,7 +21,7 @@ af::array toArray(const std::string& str) {
 } // namespace
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 ListFileDataset::ListFileDataset(
@@ -94,5 +94,5 @@ std::pair<std::vector<float>, af::dim4> ListFileDataset::loadAudio(
   return {loadSound<float>(handle.c_str()), {info.channels, info.frames}};
 }
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

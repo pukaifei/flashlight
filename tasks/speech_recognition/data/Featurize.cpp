@@ -14,7 +14,7 @@
 
 #include <glog/logging.h>
 
-#include "common/Defines.h"
+#include "flashlight/tasks/speech_recognition/common/Defines.h"
 #include "flashlight/libraries/audio/feature/Mfcc.h"
 #include "flashlight/libraries/audio/feature/Mfsc.h"
 #include "flashlight/libraries/common/String.h"
@@ -22,7 +22,7 @@
 using namespace fl::lib;
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 FeatureParams defineSpeechFeatureParams() {
@@ -246,5 +246,5 @@ FeatureData featurize(
   return feat;
 }
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

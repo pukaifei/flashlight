@@ -14,13 +14,13 @@
 
 #include <flashlight/flashlight.h>
 
-#include "runtime/runtime.h"
+#include "flashlight/tasks/speech_recognition/runtime/runtime.h"
 
 #include "flashlight/libraries/common/System.h"
 
 using namespace fl;
 using namespace fl::lib;
-using namespace fl::task::asr;
+using namespace fl::tasks::asr;
 
 namespace {
 const std::string kPath = "/tmp/test.bin";

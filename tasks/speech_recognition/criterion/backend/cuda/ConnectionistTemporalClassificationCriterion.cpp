@@ -11,10 +11,10 @@
 #include <flashlight/autograd/autograd.h>
 #include <flashlight/common/cuda.h>
 
-#include "criterion/ConnectionistTemporalClassificationCriterion.h"
-#include "criterion/CriterionUtils.h"
+#include "flashlight/tasks/speech_recognition/criterion/ConnectionistTemporalClassificationCriterion.h"
+#include "flashlight/tasks/speech_recognition/criterion/CriterionUtils.h"
 
-#include "flashlight/extensions/common/Utils.h"
+#include "flashlight/extensions/common/DistributedUtils.h"
 #include "flashlight/libraries/sequence/criterion/cuda/CriterionUtils.cuh"
 
 using namespace fl;
@@ -23,7 +23,7 @@ using namespace fl::ext;
 using CriterionUtils = fl::lib::cuda::CriterionUtils<float>;
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 namespace {
@@ -103,7 +103,7 @@ std::vector<Variable> ConnectionistTemporalClassificationCriterion::forward(
 
     // A heuristic to modify target length to be able to compute CTC loss
     L = std::min(L, T);
-    const int R = fl::task::asr::countRepeats(targetVec, L);
+    const int R = fl::tasks::asr::countRepeats(targetVec, L);
     L = std::min(L + R, T) - R;
 
     labelLengths.push_back(L);
@@ -167,5 +167,5 @@ std::vector<Variable> ConnectionistTemporalClassificationCriterion::forward(
   return {Variable(result, {input, target}, gradFunc)};
 }
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl

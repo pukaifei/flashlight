@@ -10,10 +10,10 @@
 
 #include <flashlight/flashlight.h>
 
-#include "common/Defines.h"
+#include "flashlight/tasks/speech_recognition/common/Defines.h"
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 std::shared_ptr<fl::FirstOrderOptimizer> initOptimizer(
@@ -23,5 +23,5 @@ std::shared_ptr<fl::FirstOrderOptimizer> initOptimizer(
     double momentum,
     double weightdecay);
 }
-} // namespace task
+} // namespace tasks
 } // namespace fl

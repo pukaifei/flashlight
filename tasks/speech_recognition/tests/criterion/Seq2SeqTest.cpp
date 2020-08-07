@@ -11,12 +11,12 @@
 #include <arrayfire.h>
 #include <flashlight/flashlight.h>
 
-#include "criterion/attention/attention.h"
-#include "criterion/criterion.h"
+#include "flashlight/tasks/speech_recognition/criterion/attention/attention.h"
+#include "flashlight/tasks/speech_recognition/criterion/criterion.h"
 
 using namespace fl;
 using namespace fl::ext;
-using namespace fl::task::asr;
+using namespace fl::tasks::asr;
 
 TEST(Seq2SeqTest, Seq2Seq) {
   int nclass = 40;

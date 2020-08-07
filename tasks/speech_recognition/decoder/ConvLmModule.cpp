@@ -10,10 +10,10 @@
 
 #include <string>
 
-#include "flashlight/extensions/common/Utils.h"
+#include "flashlight/extensions/common/DistributedUtils.h"
 
 namespace fl {
-namespace task {
+namespace tasks {
 namespace asr {
 
 GetConvLmScoreFunc buildGetConvLmScoreFunction(
@@ -66,5 +66,5 @@ GetConvLmScoreFunc buildGetConvLmScoreFunction(
   return getConvLmScoreFunc;
 }
 } // namespace asr
-} // namespace task
+} // namespace tasks
 } // namespace fl
