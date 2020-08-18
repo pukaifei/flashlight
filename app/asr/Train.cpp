@@ -561,7 +561,7 @@ int main(int argc, char** argv) {
       ++curEpoch; // counts partial epochs too!
       int epochsAfterDecay = curEpoch - FLAGS_lr_decay;
       double lrDecayScale = std::pow(
-          0.5
+          0.5,
           (epochsAfterDecay < 0 ? 0
                                 : 1 + epochsAfterDecay / FLAGS_lr_decay_step));
       ntwrk->train();
