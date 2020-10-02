@@ -148,8 +148,8 @@ int main(int argc, char** argv) {
         FLAGS_world_size,
         FLAGS_max_devices_per_node,
         FLAGS_rndv_filepath);
-    reducer = std::make_shared<fl::CoalescingReducer>(
-        1.0 / fl::getWorldSize(), true, true);
+    reducer = std::make_shared<fl::InlineReducer>(
+        1.0 / fl::getWorldSize());
   }
 
   int worldRank = fl::getWorldRank();
@@ -540,8 +540,8 @@ int main(int argc, char** argv) {
                    bool clampCrit,
                    int64_t nbatches) {
     if (reducer) {
-      fl::distributeModuleGrads(ntwrk, reducer);
-      fl::distributeModuleGrads(crit, reducer);
+//       fl::distributeModuleGrads(ntwrk, reducer);
+//       fl::distributeModuleGrads(crit, reducer);
     }
 
     meters.train.loss.reset();
@@ -688,6 +688,20 @@ int main(int argc, char** argv) {
         netopt->zeroGrad();
         critopt->zeroGrad();
         loss.backward();
+        
+        for (const auto& p : ntwrk->params()) {
+          if (!p.isGradAvailable()) {
+            continue;
+          }
+          p.addGrad(Variable(af::constant(0.0, p.dims()), false));
+        }
+        for (const auto& p : crit->params()) {
+          if (!p.isGradAvailable()) {
+            continue;
+          }
+          p.addGrad(Variable(af::constant(0.0, p.dims()), false));
+        }
+        
         if (reducer) {
           reducer->finalize();
         }
