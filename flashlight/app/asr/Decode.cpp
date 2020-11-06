@@ -633,56 +633,17 @@ int main(int argc, char** argv) {
         auto rawWordPrediction = results[i].words;
         auto rawTokenPrediction = results[i].tokens;
 
-<<<<<<< HEAD
-      /* 3. Get data and run decoder */
-      TestMeters meters;
-      EmissionTargetPair emissionTargetPair;
-      while (emissionQueue.get(emissionTargetPair)) {
-        const auto& emissionUnit = emissionTargetPair.first;
-        const auto& targetUnit = emissionTargetPair.second;
-
-        const auto& nFrames = emissionUnit.nFrames;
-        const auto& nTokens = emissionUnit.nTokens;
-        const auto& emission = emissionUnit.emission;
-        const auto& sampleId = emissionUnit.sampleId;
-        const auto& wordTarget = targetUnit.wordTargetStr;
-        const auto& tokenTarget = targetUnit.tokenTarget;
-
-        // DecodeResult
-        meters.timer.reset();
-        meters.timer.resume();
-        const auto& results =
-            decoder->decode(emission.data(), nFrames, nTokens);
-        meters.timer.stop();
-
-        int nTopHyps = FLAGS_isbeamdump ? results.size() : 1;
-        for (int i = 0; i < nTopHyps; i++) {
-          // Cleanup predictions
-          auto rawWordPrediction = results[i].words;
-          auto rawTokenPrediction = results[i].tokens;
-
-          auto letterTarget =
-              tknTarget2Ltr(tokenTarget, tokenDict, FLAGS_wordseparator);
-          auto letterPrediction = tknPrediction2Ltr(
-              rawTokenPrediction, tokenDict, FLAGS_wordseparator);
-          std::vector<std::string> wordPrediction;
-          if (FLAGS_uselexicon) {
-            rawWordPrediction =
-                validateIdx(rawWordPrediction, wordDict.getIndex(kUnkToken));
-            wordPrediction = wrdIdx2Wrd(rawWordPrediction, wordDict);
-          } else {
-            wordPrediction = tkn2Wrd(letterPrediction, FLAGS_wordseparator);
-=======
-        auto letterTarget = tknTarget2Ltr(tokenTarget, tokenDict);
-        auto letterPrediction =
-            tknPrediction2Ltr(rawTokenPrediction, tokenDict);
+        auto letterTarget =
+            tknTarget2Ltr(tokenTarget, tokenDict, FLAGS_wordseparator);
+        auto letterPrediction = tknPrediction2Ltr(
+            rawTokenPrediction, tokenDict, FLAGS_wordseparator);
         std::vector<std::string> wordPrediction;
         if (FLAGS_uselexicon) {
           rawWordPrediction =
               validateIdx(rawWordPrediction, wordDict.getIndex(kUnkToken));
           wordPrediction = wrdIdx2Wrd(rawWordPrediction, wordDict);
         } else {
-          wordPrediction = tkn2Wrd(letterPrediction);
+          wordPrediction = tkn2Wrd(letterPrediction, FLAGS_wordseparator);
         }
         auto wordTargetStr = join(" ", wordTarget);
         auto wordPredictionStr = join(" ", wordPrediction);
@@ -696,7 +657,6 @@ int main(int argc, char** argv) {
             std::string suffix = " (" + sampleId + ")\n";
             writeHyp(wordPredictionStr + suffix);
             writeRef(wordTargetStr + suffix);
->>>>>>> e83e7b6720f9407bc706d6c26f0a599dc0941285
           }
 
           if (FLAGS_show) {
