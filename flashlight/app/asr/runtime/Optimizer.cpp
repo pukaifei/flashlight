@@ -7,7 +7,6 @@
 
 #include "flashlight/app/asr/runtime/Optimizer.h"
 
-
 namespace fl {
 namespace app {
 namespace asr {

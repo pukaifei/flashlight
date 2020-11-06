@@ -19,7 +19,8 @@ namespace asr {
 
 std::vector<std::string> tknIdx2Ltr(
     const std::vector<int>& labels,
-    const Dictionary& d) {
+    const Dictionary& d,
+    const std::string& wordSep) {
   std::vector<std::string> result;
 
   for (auto id : labels) {
@@ -34,11 +35,11 @@ std::vector<std::string> tknIdx2Ltr(
     }
   }
 
-  if (result.size() > 0 && !FLAGS_wordseparator.empty()) {
+  if (result.size() > 0 && !wordSep.empty()) {
     if (result.front() == FLAGS_wordseparator) {
       result.erase(result.begin());
     }
-    if (!result.empty() && result.back() == FLAGS_wordseparator) {
+    if (!result.empty() && result.back() == wordSep) {
       result.pop_back();
     }
   }
@@ -46,11 +47,13 @@ std::vector<std::string> tknIdx2Ltr(
   return result;
 }
 
-std::vector<std::string> tkn2Wrd(const std::vector<std::string>& input) {
+std::vector<std::string> tkn2Wrd(
+    const std::vector<std::string>& input,
+    const std::string& wordSep) {
   std::vector<std::string> words;
   std::string currentWord = "";
   for (auto& tkn : input) {
-    if (tkn == FLAGS_wordseparator) {
+    if (tkn == wordSep) {
       if (!currentWord.empty()) {
         words.push_back(currentWord);
         currentWord = "";
@@ -77,7 +80,8 @@ std::vector<std::string> wrdIdx2Wrd(
 
 std::vector<std::string> tknTarget2Ltr(
     std::vector<int> tokens,
-    const Dictionary& tokenDict) {
+    const Dictionary& tokenDict,
+    const std::string& wordSep) {
   if (tokens.empty()) {
     return std::vector<std::string>{};
   }
@@ -89,12 +93,13 @@ std::vector<std::string> tknTarget2Ltr(
   }
   remapLabels(tokens, tokenDict);
 
-  return tknIdx2Ltr(tokens, tokenDict);
+  return tknIdx2Ltr(tokens, tokenDict, wordSep);
 }
 
 std::vector<std::string> tknPrediction2Ltr(
     std::vector<int> tokens,
-    const Dictionary& tokenDict) {
+    const Dictionary& tokenDict,
+    const std::string& wordSep) {
   if (tokens.empty()) {
     return std::vector<std::string>{};
   }
@@ -110,7 +115,7 @@ std::vector<std::string> tknPrediction2Ltr(
   tokens = validateIdx(tokens, -1);
   remapLabels(tokens, tokenDict);
 
-  return tknIdx2Ltr(tokens, tokenDict);
+  return tknIdx2Ltr(tokens, tokenDict, wordSep);
 }
 
 std::vector<int> tkn2Idx(

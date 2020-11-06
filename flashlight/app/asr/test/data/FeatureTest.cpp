@@ -207,7 +207,7 @@ TEST(FeatureTest, TargetToSingleLtr) {
   dict.addEntry("456_", 4560);
 
   std::vector<int> words = {1, 230, 4560};
-  auto target = tknIdx2Ltr(words, dict);
+  auto target = tknIdx2Ltr(words, dict, FLAGS_wordseparator);
   ASSERT_THAT(
       target, ::testing::ElementsAreArray({"1", "2", "3", "_", "4", "5", "6"}));
 }
