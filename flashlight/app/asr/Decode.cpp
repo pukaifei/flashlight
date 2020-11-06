@@ -8,9 +8,11 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <future>
 #include <iomanip>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <gflags/gflags.h>
@@ -22,6 +24,7 @@
 #include "flashlight/app/asr/decoder/Defines.h"
 #include "flashlight/app/asr/decoder/TranscriptionUtils.h"
 #include "flashlight/app/asr/runtime/runtime.h"
+#include "flashlight/ext/common/Serializer.h"
 #include "flashlight/lib/common/ProducerConsumerQueue.h"
 #include "flashlight/lib/text/decoder/LexiconDecoder.h"
 #include "flashlight/lib/text/decoder/LexiconFreeDecoder.h"
@@ -66,13 +69,18 @@ int main(int argc, char** argv) {
   std::shared_ptr<fl::Module> network;
   std::shared_ptr<SequenceCriterion> criterion;
   std::unordered_map<std::string, std::string> cfg;
+  std::string version;
 
   /* Using acoustic model */
   if (!FLAGS_am.empty()) {
     FL_LOG(fl::INFO) << "[Network] Reading acoustic model from " << FLAGS_am;
     af::setDevice(0);
-    Serializer::load(FLAGS_am, cfg, network, criterion);
+    Serializer::load(FLAGS_am, version, cfg, network, criterion);
     network->eval();
+    if (version != FL_APP_ASR_VERSION) {
+      FL_LOG(fl::WARNING) << "[Network] Model version " << version
+                          << " and code version " << FL_APP_ASR_VERSION;
+    }
     FL_LOG(fl::INFO) << "[Network] " << network->prettyString();
     if (criterion) {
       criterion->eval();
@@ -131,6 +139,11 @@ int main(int argc, char** argv) {
     lexicon = loadWords(FLAGS_lexicon, FLAGS_maxword);
     wordDict = createWordDict(lexicon);
     FL_LOG(fl::INFO) << "Number of words: " << wordDict.indexSize();
+  } else {
+    if (FLAGS_uselexicon || FLAGS_decodertype == "wrd") {
+      FL_LOG(fl::FATAL) << "For lexicon-based beam-search decoder "
+                        << "lexicon shouldn't be empty";
+    }
   }
 
   DictionaryMap dicts = {{kTargetIdx, tokenDict}, {kWordIdx, wordDict}};
@@ -217,7 +230,12 @@ int main(int argc, char** argv) {
       af::setDevice(0);
       FL_LOG(fl::INFO) << "[ConvLM]: Loading LM from " << FLAGS_lm;
       std::shared_ptr<fl::Module> convLmModel;
-      Serializer::load(FLAGS_lm, convLmModel);
+      std::string convlmVersion;
+      Serializer::load(FLAGS_lm, convlmVersion, convLmModel);
+      if (convlmVersion != FL_APP_ASR_VERSION) {
+        FL_LOG(fl::WARNING) << "[Convlm] Model version " << convlmVersion
+                            << " and code version " << FL_APP_ASR_VERSION;
+      }
       convLmModel->eval();
 
       auto getConvLmScoreFunc = buildGetConvLmScoreFunction(convLmModel);
@@ -239,7 +257,7 @@ int main(int argc, char** argv) {
       FLAGS_criterion == kCtcCriterion ? tokenDict.getIndex(kBlankToken) : -1;
   int silIdx = -1;
   if (FLAGS_wordseparator != "") {
-    tokenDict.getIndex(FLAGS_wordseparator);
+    silIdx = tokenDict.getIndex(FLAGS_wordseparator);
   }
   std::shared_ptr<Trie> trie = nullptr;
   if (FLAGS_decodertype == "wrd" || FLAGS_uselexicon) {
@@ -311,20 +329,27 @@ int main(int argc, char** argv) {
     std::shared_ptr<SequenceCriterion> localCriterion = criterion;
     if (tid != 0) {
       std::unordered_map<std::string, std::string> dummyCfg;
-      Serializer::load(FLAGS_am, dummyCfg, localNetwork, localCriterion);
+      std::string dummyVersion;
+      Serializer::load(
+          FLAGS_am, dummyVersion, dummyCfg, localNetwork, localCriterion);
       localNetwork->eval();
       localCriterion->eval();
     }
-
-    while (datasetGlobalSampleId < nSamples) {
+    while (true) {
       /* 1. Get sample */
       int datasetLocalSampleId = -1;
       std::vector<af::array> sample;
       {
         std::lock_guard<std::mutex> lock(dataReadMutex);
+        if (datasetGlobalSampleId >= nSamples) {
+          break;
+        }
         sample = ds->get(datasetGlobalSampleId);
         datasetLocalSampleId = datasetGlobalSampleId;
         datasetGlobalSampleId++;
+      }
+      if (datasetGlobalSampleId > nSamples) {
+        break;
       }
       auto sampleId = readSampleIds(sample[kSampleIdx]).front();
 
@@ -361,7 +386,8 @@ int main(int argc, char** argv) {
         std::string emissionDir =
             pathsConcat(FLAGS_emission_dir, cleanTestPath);
         std::string savePath = pathsConcat(emissionDir, sampleId + ".bin");
-        Serializer::load(savePath, emissionUnit);
+        std::string eVersion;
+        Serializer::load(savePath, eVersion, emissionUnit);
       }
 
       emissionQueue.add({emissionUnit, targetUnit});
@@ -399,57 +425,78 @@ int main(int argc, char** argv) {
                      &sliceNumTokens,
                      &sliceNumSamples,
                      &sliceTime](int tid) {
-    try {
-      /* 1. Prepare GPU-dependent resources */
-      // Note: These 2 GPU-dependent models should be placed on different
-      // cards
-      // for different threads and nthread_decoder should not be greater
-      // than
-      // the number of GPUs.
-      std::shared_ptr<SequenceCriterion> localCriterion = criterion;
-      std::shared_ptr<LM> localLm = lm;
-      if (FLAGS_lmtype == "convlm" || criterionType == CriterionType::S2S) {
-        if (tid >= af::getDeviceCount()) {
-          FL_LOG(fl::FATAL)
-              << "FLAGS_nthread_decoder exceeds the number of visible GPUs";
-        }
-        af::setDevice(tid);
+    /* 1. Prepare GPU-dependent resources */
+    // Note: These 2 GPU-dependent models should be placed on different
+    // cards
+    // for different threads and nthread_decoder should not be greater
+    // than
+    // the number of GPUs.
+    std::shared_ptr<SequenceCriterion> localCriterion = criterion;
+    std::shared_ptr<LM> localLm = lm;
+    if (FLAGS_lmtype == "convlm" || criterionType == CriterionType::S2S) {
+      if (tid >= af::getDeviceCount()) {
+        FL_LOG(fl::FATAL)
+            << "FLAGS_nthread_decoder exceeds the number of visible GPUs";
+      }
+      af::setDevice(tid);
+    }
+
+    // Make a copy for non-main threads.
+    if (tid != 0) {
+      if (FLAGS_lmtype == "convlm") {
+        FL_LOG(fl::INFO) << "[ConvLM]: Loading LM from " << FLAGS_lm;
+        std::shared_ptr<fl::Module> convLmModel;
+        std::string convlmVersion;
+        Serializer::load(FLAGS_lm, convlmVersion, convLmModel);
+        convLmModel->eval();
+
+        auto getConvLmScoreFunc = buildGetConvLmScoreFunction(convLmModel);
+        localLm = std::make_shared<ConvLM>(
+            getConvLmScoreFunc,
+            FLAGS_lm_vocab,
+            usrDict,
+            FLAGS_lm_memory,
+            FLAGS_beamsize);
       }
 
-      // Make a copy for non-main threads.
-      if (tid != 0) {
-        if (FLAGS_lmtype == "convlm") {
-          FL_LOG(fl::INFO) << "[ConvLM]: Loading LM from " << FLAGS_lm;
-          std::shared_ptr<fl::Module> convLmModel;
-          Serializer::load(FLAGS_lm, convLmModel);
-          convLmModel->eval();
-
-          auto getConvLmScoreFunc = buildGetConvLmScoreFunction(convLmModel);
-          localLm = std::make_shared<ConvLM>(
-              getConvLmScoreFunc,
-              FLAGS_lm_vocab,
-              usrDict,
-              FLAGS_lm_memory,
-              FLAGS_beamsize);
-        }
-
-        if (criterionType == CriterionType::S2S) {
-          std::shared_ptr<fl::Module> dummyNetwork;
-          std::unordered_map<std::string, std::string> dummyCfg;
-          Serializer::load(FLAGS_am, dummyCfg, dummyNetwork, localCriterion);
-          localCriterion->eval();
-        }
-      }
-
-      /* 2. Build Decoder */
-      std::unique_ptr<Decoder> decoder;
       if (criterionType == CriterionType::S2S) {
-        auto amUpdateFunc = FLAGS_criterion == kSeq2SeqCriterion
-            ? buildAmUpdateFunction(localCriterion)
-            : buildTransformerAmUpdateFunction(localCriterion);
-        int eosIdx = tokenDict.getIndex(fl::app::asr::kEosToken);
+        std::shared_ptr<fl::Module> dummyNetwork;
+        std::unordered_map<std::string, std::string> dummyCfg;
+        Serializer::load(FLAGS_am, dummyCfg, dummyNetwork, localCriterion);
+        localCriterion->eval();
+      }
+    }
 
-        if (FLAGS_decodertype == "wrd") {
+    /* 2. Build Decoder */
+    std::unique_ptr<Decoder> decoder;
+    if (criterionType == CriterionType::S2S) {
+      auto amUpdateFunc = FLAGS_criterion == kSeq2SeqCriterion
+          ? buildAmUpdateFunction(localCriterion)
+          : buildTransformerAmUpdateFunction(localCriterion);
+      int eosIdx = tokenDict.getIndex(fl::app::asr::kEosToken);
+
+      if (FLAGS_decodertype == "wrd") {
+        decoder.reset(new LexiconSeq2SeqDecoder(
+            {
+                .beamSize = FLAGS_beamsize,
+                .beamSizeToken = FLAGS_beamsizetoken,
+                .beamThreshold = FLAGS_beamthreshold,
+                .lmWeight = FLAGS_lmweight,
+                .wordScore = FLAGS_wordscore,
+                .eosScore = FLAGS_eosscore,
+                .logAdd = FLAGS_logadd,
+            },
+            trie,
+            localLm,
+            eosIdx,
+            amUpdateFunc,
+            FLAGS_maxdecoderoutputlen,
+            false));
+        FL_LOG(fl::INFO)
+            << "[Decoder] LexiconSeq2Seq decoder with word-LM loaded in thread: "
+            << tid;
+      } else if (FLAGS_decodertype == "tkn") {
+        if (FLAGS_uselexicon) {
           decoder.reset(new LexiconSeq2SeqDecoder(
               {
                   .beamSize = FLAGS_beamsize,
@@ -465,120 +512,128 @@ int main(int argc, char** argv) {
               eosIdx,
               amUpdateFunc,
               FLAGS_maxdecoderoutputlen,
-              false));
+              true));
           FL_LOG(fl::INFO)
-              << "[Decoder] LexiconSeq2Seq decoder with word-LM loaded in thread: "
+              << "[Decoder] LexiconSeq2Seq decoder with token-LM loaded in thread: "
               << tid;
-        } else if (FLAGS_decodertype == "tkn") {
-          if (FLAGS_uselexicon) {
-            decoder.reset(new LexiconSeq2SeqDecoder(
-                {
-                    .beamSize = FLAGS_beamsize,
-                    .beamSizeToken = FLAGS_beamsizetoken,
-                    .beamThreshold = FLAGS_beamthreshold,
-                    .lmWeight = FLAGS_lmweight,
-                    .wordScore = FLAGS_wordscore,
-                    .eosScore = FLAGS_eosscore,
-                    .logAdd = FLAGS_logadd,
-                },
-                trie,
-                localLm,
-                eosIdx,
-                amUpdateFunc,
-                FLAGS_maxdecoderoutputlen,
-                true));
-            FL_LOG(fl::INFO)
-                << "[Decoder] LexiconSeq2Seq decoder with token-LM loaded in thread: "
-                << tid;
-          } else {
-            decoder.reset(new LexiconFreeSeq2SeqDecoder(
-                {
-                    .beamSize = FLAGS_beamsize,
-                    .beamSizeToken = FLAGS_beamsizetoken,
-                    .beamThreshold = FLAGS_beamthreshold,
-                    .lmWeight = FLAGS_lmweight,
-                    .eosScore = FLAGS_eosscore,
-                    .logAdd = FLAGS_logadd,
-                },
-                localLm,
-                eosIdx,
-                amUpdateFunc,
-                FLAGS_maxdecoderoutputlen));
-            FL_LOG(fl::INFO)
-                << "[Decoder] LexiconFreeSeq2Seq decoder with token-LM loaded in thread: "
-                << tid;
-          }
         } else {
-          FL_LOG(fl::FATAL)
-              << "Unsupported decoder type: " << FLAGS_decodertype;
+          decoder.reset(new LexiconFreeSeq2SeqDecoder(
+              {
+                  .beamSize = FLAGS_beamsize,
+                  .beamSizeToken = FLAGS_beamsizetoken,
+                  .beamThreshold = FLAGS_beamthreshold,
+                  .lmWeight = FLAGS_lmweight,
+                  .eosScore = FLAGS_eosscore,
+                  .logAdd = FLAGS_logadd,
+              },
+              localLm,
+              eosIdx,
+              amUpdateFunc,
+              FLAGS_maxdecoderoutputlen));
+          FL_LOG(fl::INFO)
+              << "[Decoder] LexiconFreeSeq2Seq decoder with token-LM loaded in thread: "
+              << tid;
         }
       } else {
-        if (FLAGS_decodertype == "wrd") {
+        FL_LOG(fl::FATAL) << "Unsupported decoder type: " << FLAGS_decodertype;
+      }
+    } else {
+      if (FLAGS_decodertype == "wrd") {
+        decoder.reset(new LexiconDecoder(
+            {
+                .beamSize = FLAGS_beamsize,
+                .beamSizeToken = FLAGS_beamsizetoken,
+                .beamThreshold = FLAGS_beamthreshold,
+                .lmWeight = FLAGS_lmweight,
+                .wordScore = FLAGS_wordscore,
+                .unkScore = FLAGS_unkscore,
+                .silScore = FLAGS_silscore,
+                .logAdd = FLAGS_logadd,
+                .criterionType = criterionType
+            },
+            trie,
+            localLm,
+            silIdx,
+            blankIdx,
+            unkWordIdx,
+            transition,
+            false));
+        FL_LOG(fl::INFO)
+            << "[Decoder] Lexicon decoder with word-LM loaded in thread: "
+            << tid;
+      } else if (FLAGS_decodertype == "tkn") {
+        if (FLAGS_uselexicon) {
           decoder.reset(new LexiconDecoder(
-              {.beamSize = FLAGS_beamsize,
-               .beamSizeToken = FLAGS_beamsizetoken,
-               .beamThreshold = FLAGS_beamthreshold,
-               .lmWeight = FLAGS_lmweight,
-               .wordScore = FLAGS_wordscore,
-               .unkScore = FLAGS_unkscore,
-               .silScore = FLAGS_silscore,
-               .logAdd = FLAGS_logadd,
-               .criterionType = criterionType},
+              {
+                  .beamSize = FLAGS_beamsize,
+                  .beamSizeToken = FLAGS_beamsizetoken,
+                  .beamThreshold = FLAGS_beamthreshold,
+                  .lmWeight = FLAGS_lmweight,
+                  .wordScore = FLAGS_wordscore,
+                  .unkScore = FLAGS_unkscore,
+                  .silScore = FLAGS_silscore,
+                  .logAdd = FLAGS_logadd,
+                  .criterionType = criterionType
+              },
               trie,
               localLm,
               silIdx,
               blankIdx,
               unkWordIdx,
               transition,
-              false));
+              true));
           FL_LOG(fl::INFO)
-              << "[Decoder] Lexicon decoder with word-LM loaded in thread: "
+              << "[Decoder] Lexicon decoder with token-LM loaded in thread: "
               << tid;
-        } else if (FLAGS_decodertype == "tkn") {
-          if (FLAGS_uselexicon) {
-            decoder.reset(new LexiconDecoder(
-                {.beamSize = FLAGS_beamsize,
-                 .beamSizeToken = FLAGS_beamsizetoken,
-                 .beamThreshold = FLAGS_beamthreshold,
-                 .lmWeight = FLAGS_lmweight,
-                 .wordScore = FLAGS_wordscore,
-                 .unkScore = FLAGS_unkscore,
-                 .silScore = FLAGS_silscore,
-                 .logAdd = FLAGS_logadd,
-                 .criterionType = criterionType},
-                trie,
-                localLm,
-                silIdx,
-                blankIdx,
-                unkWordIdx,
-                transition,
-                true));
-            FL_LOG(fl::INFO)
-                << "[Decoder] Lexicon decoder with token-LM loaded in thread: "
-                << tid;
-          } else {
-            decoder.reset(new LexiconFreeDecoder(
-                {.beamSize = FLAGS_beamsize,
-                 .beamSizeToken = FLAGS_beamsizetoken,
-                 .beamThreshold = FLAGS_beamthreshold,
-                 .lmWeight = FLAGS_lmweight,
-                 .silScore = FLAGS_silscore,
-                 .logAdd = FLAGS_logadd,
-                 .criterionType = criterionType},
-                localLm,
-                silIdx,
-                blankIdx,
-                transition));
-            FL_LOG(fl::INFO)
-                << "[Decoder] Lexicon-free decoder with token-LM loaded in thread: "
-                << tid;
-          }
         } else {
-          FL_LOG(fl::FATAL)
-              << "Unsupported decoder type: " << FLAGS_decodertype;
+          decoder.reset(new LexiconFreeDecoder(
+              {
+                  .beamSize = FLAGS_beamsize,
+                  .beamSizeToken = FLAGS_beamsizetoken,
+                  .beamThreshold = FLAGS_beamthreshold,
+                  .lmWeight = FLAGS_lmweight,
+                  .silScore = FLAGS_silscore,
+                  .logAdd = FLAGS_logadd,
+                  .criterionType = criterionType
+              }, 
+              localLm, 
+              silIdx, 
+              blankIdx, 
+              transition));
+          FL_LOG(fl::INFO)
+              << "[Decoder] Lexicon-free decoder with token-LM loaded in thread: "
+              << tid;
         }
+      } else {
+        FL_LOG(fl::FATAL) << "Unsupported decoder type: " << FLAGS_decodertype;
       }
+    }
+    /* 3. Get data and run decoder */
+    TestMeters meters;
+    EmissionTargetPair emissionTargetPair;
+    while (emissionQueue.get(emissionTargetPair)) {
+      const auto& emissionUnit = emissionTargetPair.first;
+      const auto& targetUnit = emissionTargetPair.second;
 
+      const auto& nFrames = emissionUnit.nFrames;
+      const auto& nTokens = emissionUnit.nTokens;
+      const auto& emission = emissionUnit.emission;
+      const auto& sampleId = emissionUnit.sampleId;
+      const auto& wordTarget = targetUnit.wordTargetStr;
+      const auto& tokenTarget = targetUnit.tokenTarget;
+      // DecodeResult
+      meters.timer.reset();
+      meters.timer.resume();
+      const auto& results = decoder->decode(emission.data(), nFrames, nTokens);
+      meters.timer.stop();
+
+      int nTopHyps = FLAGS_isbeamdump ? results.size() : 1;
+      for (int i = 0; i < nTopHyps; i++) {
+        // Cleanup predictions
+        auto rawWordPrediction = results[i].words;
+        auto rawTokenPrediction = results[i].tokens;
+
+<<<<<<< HEAD
       /* 3. Get data and run decoder */
       TestMeters meters;
       EmissionTargetPair emissionTargetPair;
@@ -617,80 +672,89 @@ int main(int argc, char** argv) {
             wordPrediction = wrdIdx2Wrd(rawWordPrediction, wordDict);
           } else {
             wordPrediction = tkn2Wrd(letterPrediction, FLAGS_wordseparator);
+=======
+        auto letterTarget = tknTarget2Ltr(tokenTarget, tokenDict);
+        auto letterPrediction =
+            tknPrediction2Ltr(rawTokenPrediction, tokenDict);
+        std::vector<std::string> wordPrediction;
+        if (FLAGS_uselexicon) {
+          rawWordPrediction =
+              validateIdx(rawWordPrediction, wordDict.getIndex(kUnkToken));
+          wordPrediction = wrdIdx2Wrd(rawWordPrediction, wordDict);
+        } else {
+          wordPrediction = tkn2Wrd(letterPrediction);
+        }
+        auto wordTargetStr = join(" ", wordTarget);
+        auto wordPredictionStr = join(" ", wordPrediction);
+
+        // Normal decoding and computing WER
+        if (!FLAGS_isbeamdump) {
+          meters.werSlice.add(wordPrediction, wordTarget);
+          meters.lerSlice.add(letterPrediction, letterTarget);
+
+          if (!FLAGS_sclite.empty()) {
+            std::string suffix = " (" + sampleId + ")\n";
+            writeHyp(wordPredictionStr + suffix);
+            writeRef(wordTargetStr + suffix);
+>>>>>>> e83e7b6720f9407bc706d6c26f0a599dc0941285
           }
-          auto wordTargetStr = join(" ", wordTarget);
-          auto wordPredictionStr = join(" ", wordPrediction);
 
-          // Normal decoding and computing WER
-          if (!FLAGS_isbeamdump) {
-            meters.werSlice.add(wordPrediction, wordTarget);
-            meters.lerSlice.add(letterPrediction, letterTarget);
-
-            if (!FLAGS_sclite.empty()) {
-              std::string suffix = " (" + sampleId + ")\n";
-              writeHyp(wordPredictionStr + suffix);
-              writeRef(wordTargetStr + suffix);
-            }
-
-            if (FLAGS_show) {
-              meters.wer.reset();
-              meters.ler.reset();
-              meters.wer.add(wordPrediction, wordTarget);
-              meters.ler.add(letterPrediction, letterTarget);
-
-              std::stringstream buffer;
-              buffer << "|T|: " << wordTargetStr << std::endl;
-              buffer << "|P|: " << wordPredictionStr << std::endl;
-              if (FLAGS_showletters) {
-                buffer << "|t|: " << join(" ", letterTarget) << std::endl;
-                buffer << "|p|: " << join(" ", letterPrediction) << std::endl;
-              }
-              buffer << "[sample: " << sampleId
-                     << ", WER: " << meters.wer.value()[0]
-                     << "\%, LER: " << meters.ler.value()[0]
-                     << "\%, slice WER: " << meters.werSlice.value()[0]
-                     << "\%, slice LER: " << meters.lerSlice.value()[0]
-                     << "\%, decoded samples (thread " << tid
-                     << "): " << sliceNumSamples[tid] + 1 << "]" << std::endl;
-
-              std::cout << buffer.str();
-              if (!FLAGS_sclite.empty()) {
-                writeLog(buffer.str());
-              }
-            }
-
-            // Update conters
-            sliceNumWords[tid] += wordTarget.size();
-            sliceNumTokens[tid] += letterTarget.size();
-            sliceTime[tid] += meters.timer.value();
-            sliceNumSamples[tid] += 1;
-          }
-          // Beam Dump
-          else {
+          if (FLAGS_show) {
             meters.wer.reset();
+            meters.ler.reset();
             meters.wer.add(wordPrediction, wordTarget);
-            auto wer = meters.wer.value()[0];
+            meters.ler.add(letterPrediction, letterTarget);
 
-            if (FLAGS_sclite.empty()) {
-              FL_LOG(fl::FATAL)
-                  << "FLAGS_sclite is empty, nowhere to dump the beam.";
+            std::stringstream buffer;
+            buffer << "|T|: " << wordTargetStr << std::endl;
+            buffer << "|P|: " << wordPredictionStr << std::endl;
+            if (FLAGS_showletters) {
+              buffer << "|t|: " << join(" ", letterTarget) << std::endl;
+              buffer << "|p|: " << join(" ", letterPrediction) << std::endl;
             }
+            buffer << "[sample: " << sampleId
+                   << ", WER: " << meters.wer.value()[0]
+                   << "\%, LER: " << meters.ler.value()[0]
+                   << "\%, slice WER: " << meters.werSlice.value()[0]
+                   << "\%, slice LER: " << meters.lerSlice.value()[0]
+                   << "\%, decoded samples (thread " << tid
+                   << "): " << sliceNumSamples[tid] + 1 << "]" << std::endl;
 
-            auto score = results[i].score;
-            auto amScore = results[i].amScore;
-            auto lmScore = results[i].lmScore;
-            auto outString = sampleId + " | " + std::to_string(score) + " | " +
-                std::to_string(amScore) + " | " + std::to_string(lmScore) +
-                " | " + std::to_string(wer) + " | " + wordPredictionStr + "\n";
-            writeHyp(outString);
+            std::cout << buffer.str();
+            if (!FLAGS_sclite.empty()) {
+              writeLog(buffer.str());
+            }
           }
+
+          // Update conters
+          sliceNumWords[tid] += wordTarget.size();
+          sliceNumTokens[tid] += letterTarget.size();
+          sliceTime[tid] += meters.timer.value();
+          sliceNumSamples[tid] += 1;
+        }
+        // Beam Dump
+        else {
+          meters.wer.reset();
+          meters.wer.add(wordPrediction, wordTarget);
+          auto wer = meters.wer.value()[0];
+
+          if (FLAGS_sclite.empty()) {
+            FL_LOG(fl::FATAL)
+                << "FLAGS_sclite is empty, nowhere to dump the beam.";
+          }
+
+          auto score = results[i].score;
+          auto amScore = results[i].amScore;
+          auto lmScore = results[i].lmScore;
+          auto outString = sampleId + " | " + std::to_string(score) + " | " +
+              std::to_string(amScore) + " | " + std::to_string(lmScore) +
+              " | " + std::to_string(wer) + " | " + wordPredictionStr + "\n";
+          writeHyp(outString);
         }
       }
-      sliceWer[tid] = meters.werSlice.value()[0];
-      sliceLer[tid] = meters.lerSlice.value()[0];
-    } catch (const std::exception& exc) {
-      FL_LOG(fl::FATAL) << "Exception in thread " << tid << "\n" << exc.what();
     }
+    sliceWer[tid] = meters.werSlice.value()[0];
+    sliceLer[tid] = meters.lerSlice.value()[0];
   };
 
   /* ===================== Spread threades ===================== */
@@ -706,34 +770,50 @@ int main(int argc, char** argv) {
 
   auto startThreadsAndJoin = [&runAmForward, &runDecoder](
                                  int nAmThreads, int nDecoderThreads) {
+    // TODO possibly try catch for futures to proper logging of all errors
+    // https://github.com/facebookresearch/gtn/blob/master/gtn/parallel/parallel_map.h#L154
+
     // We have to run AM forwarding and decoding in sequential to avoid GPU
     // OOM with two large neural nets.
     if (FLAGS_lmtype == "convlm") {
       // 1. AM forwarding
       {
+        std::vector<std::future<void>> futs(nAmThreads);
         fl::ThreadPool threadPool(nAmThreads);
         for (int i = 0; i < nAmThreads; i++) {
-          threadPool.enqueue(runAmForward, i);
+          futs[i] = threadPool.enqueue(runAmForward, i);
+        }
+        for (int i = 0; i < nAmThreads; i++) {
+          futs[i].get();
         }
       }
       // 2. Decoding
       {
+        std::vector<std::future<void>> futs(nDecoderThreads);
         fl::ThreadPool threadPool(nDecoderThreads);
         for (int i = 0; i < nDecoderThreads; i++) {
-          threadPool.enqueue(runDecoder, i);
+          futs[i] = threadPool.enqueue(runDecoder, i);
+        }
+        for (int i = 0; i < nDecoderThreads; i++) {
+          futs[i].get();
         }
       }
     }
     // Non-convLM decoding. AM forwarding and decoding can be run in parallel.
     else {
+      std::vector<std::future<void>> futs(nAmThreads + nDecoderThreads);
       fl::ThreadPool threadPool(nAmThreads + nDecoderThreads);
       // AM forwarding threads
       for (int i = 0; i < nAmThreads; i++) {
-        threadPool.enqueue(runAmForward, i);
+        futs[i] = threadPool.enqueue(runAmForward, i);
       }
       // Decoding threads
       for (int i = 0; i < nDecoderThreads; i++) {
-        threadPool.enqueue(runDecoder, i);
+        futs[i + nAmThreads] = threadPool.enqueue(runDecoder, i);
+      }
+
+      for (int i = 0; i < nAmThreads + nDecoderThreads; i++) {
+        futs[i].get();
       }
     }
   };
