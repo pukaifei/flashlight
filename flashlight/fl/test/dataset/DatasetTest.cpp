@@ -488,3 +488,67 @@ TEST(DatasetTest, MemoryBlobDataset) {
     }
   }
 }
+
+TEST(DatasetTest, PrefetchDatasetCorrectness) {
+  std::vector<af::array> tensormap = {af::randu(100, 200, 300)};
+  auto tensords = std::make_shared<TensorDataset>(tensormap);
+
+  Dataset::TransformFunction scaleAndAdd = [](const af::array& a) {
+    return af::cos(a) + 10.0;
+  };
+
+  auto transformDs = std::make_shared<TransformDataset>(
+      tensords, std::vector<Dataset::TransformFunction>{scaleAndAdd});
+
+  auto prefetchDs = std::make_shared<PrefetchDataset>(transformDs, 2, 2);
+  for (int i = 0; i < transformDs->size(); ++i) {
+    auto sample1 = transformDs->get(i);
+    auto sample2 = prefetchDs->get(i);
+    ASSERT_EQ(sample1.size(), sample2.size());
+    for (int j = 0; j < sample1.size(); ++j) {
+      ASSERT_TRUE(allClose(sample1[j], sample2[j]));
+    }
+  }
+}
+
+TEST(DatasetTest, DISABLED_PrefetchDatasetPerformance) {
+  // Flaky test. Disabled for now.
+  std::vector<af::array> tensormap = {af::randu(100, 200, 300)};
+  auto tensords = std::make_shared<TensorDataset>(tensormap);
+
+  Dataset::TransformFunction scaleAndAdd = [](const af::array& a) {
+    /* sleep override */
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    return af::sin(a) + 1.0;
+  };
+  auto transformDs = std::make_shared<TransformDataset>(
+      tensords, std::vector<Dataset::TransformFunction>{scaleAndAdd});
+
+  auto start = std::chrono::high_resolution_clock::now();
+  for (auto& sample : *transformDs) {
+    (void)sample;
+  }
+  auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::high_resolution_clock::now() - start);
+  ASSERT_NEAR(dur.count(), transformDs->size(), transformDs->size() / 5);
+
+  int64_t numthreads = 4;
+  auto prefetchDs =
+      std::make_shared<PrefetchDataset>(transformDs, numthreads, numthreads);
+
+  start = std::chrono::high_resolution_clock::now();
+  for (auto& sample : *prefetchDs) {
+    (void)sample;
+  }
+  dur = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::high_resolution_clock::now() - start);
+  ASSERT_NEAR(
+      dur.count(),
+      transformDs->size() / numthreads,
+      transformDs->size() / numthreads / 5);
+}
+
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
