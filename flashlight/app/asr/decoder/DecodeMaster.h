@@ -22,9 +22,9 @@ namespace asr {
 struct DecodeMasterLexiconFreeOptions {
   int beamSize;
   int beamSizeToken;
-  float beamThreshold;
-  float lmWeight;
-  float silScore;
+  double beamThreshold;
+  double lmWeight;
+  double silScore;
   bool logAdd;
   std::string silToken;
   std::string blankToken;
@@ -33,11 +33,11 @@ struct DecodeMasterLexiconFreeOptions {
 struct DecodeMasterLexiconOptions {
   int beamSize;
   int beamSizeToken;
-  float beamThreshold;
-  float lmWeight;
-  float silScore;
-  float wordScore;
-  float unkScore;
+  double beamThreshold;
+  double lmWeight;
+  double silScore;
+  double wordScore;
+  double unkScore;
   bool logAdd;
   std::string silToken;
   std::string blankToken;

@@ -19,6 +19,7 @@
 #include "flashlight/app/asr/common/Defines.h"
 #include "flashlight/app/asr/criterion/criterion.h"
 #include "flashlight/app/asr/data/FeatureTransforms.h"
+#include "flashlight/app/asr/decoder/DecodeMaster.h"
 #include "flashlight/app/asr/decoder/TranscriptionUtils.h"
 #include "flashlight/app/asr/runtime/runtime.h"
 #include "flashlight/ext/common/DistributedUtils.h"
@@ -28,6 +29,7 @@
 #include "flashlight/fl/contrib/contrib.h"
 #include "flashlight/fl/flashlight.h"
 #include "flashlight/lib/common/System.h"
+#include "flashlight/lib/text/decoder/lm/KenLM.h"
 #include "flashlight/lib/text/dictionary/Dictionary.h"
 #include "flashlight/lib/text/dictionary/Utils.h"
 
@@ -279,7 +281,7 @@ int main(int argc, char** argv) {
   int targetpadVal = FLAGS_eostoken
       ? tokenDict.getIndex(fl::app::asr::kEosToken)
       : kTargetPadValue;
-  int wordpadVal = wordDict.getIndex(kUnkToken);
+  int wordpadVal = kTargetPadValue; 
 
   std::vector<std::string> trainSplits = split(",", FLAGS_train, true);
   auto trainds = createDataset(
@@ -316,6 +318,8 @@ int main(int argc, char** argv) {
   std::shared_ptr<SequenceCriterion> criterion;
   std::shared_ptr<fl::FirstOrderOptimizer> netoptim;
   std::shared_ptr<fl::FirstOrderOptimizer> critoptim;
+  std::shared_ptr<fl::lib::text::LM> lm;
+  std::shared_ptr<WordDecodeMaster> dm;
 
   auto scalemode = getCriterionScaleMode(FLAGS_onorm, FLAGS_sqnorm);
   if (runStatus == kTrainMode) {
@@ -370,6 +374,19 @@ int main(int argc, char** argv) {
   FL_LOG_MASTER(fl::INFO) << "[Network Params: " << numTotalParams(network)
                           << "]";
   FL_LOG_MASTER(fl::INFO) << "[Criterion] " << criterion->prettyString();
+
+  if (!FLAGS_lm.empty()) {
+    if (FLAGS_decodertype == "wrd" && FLAGS_lmtype == "kenlm") {
+      lm = std::make_shared<KenLM>(FLAGS_lm, wordDict);
+      dm = std::make_shared<WordDecodeMaster>(
+          network, lm, tokenDict, wordDict, DecodeMasterTrainOptions{
+            .repLabel = FLAGS_replabel,
+            .wordSepIsPartOfToken = FLAGS_usewordpiece,
+            .surround = FLAGS_surround});
+    } else {
+      throw std::runtime_error("Other decoders are not supported yet during training");
+    }
+  }
 
   if (runStatus == kTrainMode || runStatus == kForkMode) {
     netoptim = initOptimizer(
@@ -570,7 +587,7 @@ int main(int argc, char** argv) {
     }
   };
 
-  auto test = [&evalOutput](
+  auto test = [&evalOutput, &dm, &lexicon](
                   std::shared_ptr<fl::Module> ntwrk,
                   std::shared_ptr<SequenceCriterion> crit,
                   std::shared_ptr<fl::Dataset> validds,
@@ -580,8 +597,61 @@ int main(int argc, char** argv) {
     mtrs.tknEdit.reset();
     mtrs.wrdEdit.reset();
     mtrs.loss.reset();
+
     auto curValidset = loadPrefetchDataset(
         validds, FLAGS_nthread, false /* shuffle */, 0 /* seed */);
+
+    if (dm) {
+      auto t0 = std::chrono::high_resolution_clock::now();
+      FL_LOG_MASTER(fl::INFO) << "   * DM: compute emissions";
+      auto eds = dm->forward(curValidset, -1);
+      FL_LOG_MASTER(fl::INFO) << "   * DM: decode";
+      std::vector<double> lmweights;
+      for (double lmweight = FLAGS_lmweight_low;
+           lmweight <= FLAGS_lmweight_high;
+           lmweight += FLAGS_lmweight_step) {
+        lmweights.push_back(lmweight);
+      }
+      std::vector<double> wers(lmweights.size());
+      std::vector<std::thread> threads;
+      for (int i = 0; i < lmweights.size(); i++) {
+        threads.push_back(
+            std::thread([&lmweights, &wers, dm, eds, &lexicon, i]() {
+              double lmweight = lmweights[i];
+              DecodeMasterLexiconOptions opt = {
+                  .beamSize = FLAGS_beamsize,
+                  .beamSizeToken = FLAGS_beamsizetoken,
+                  .beamThreshold = FLAGS_beamthreshold,
+                  .lmWeight = lmweight,
+                  .silScore = FLAGS_silscore,
+                  .wordScore = FLAGS_wordscore,
+                  .unkScore = FLAGS_unkscore,
+                  .logAdd = FLAGS_logadd,
+                  .silToken = FLAGS_wordseparator,
+                  .blankToken = kBlankToken,
+                  .unkToken = kUnkToken,
+                  .smearMode =
+                      (FLAGS_smearing == "max" ? SmearingMode::MAX
+                                               : SmearingMode::NONE)};
+              auto pds = dm->decode(eds, lexicon, opt);
+              std::vector<double> wer, ler;
+              std::tie(ler, wer) = dm->computeMetrics(pds, FLAGS_wordseparator);
+              wers[i] = wer[0];
+            }));
+      }
+      for (auto& thread : threads) {
+        thread.join();
+      }
+      for (int i = 0; i < lmweights.size(); i++) {
+        FL_LOG_MASTER(fl::INFO) << "   * DM: lmweight=" << lmweights[i]
+                         << " WER: " << wers[i];
+      }
+      FL_LOG_MASTER(fl::INFO) << "   * DM: done.";
+      auto t1 = std::chrono::high_resolution_clock::now();
+      auto dt = 1.e-9 *
+          std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
+      FL_LOG_MASTER(fl::INFO) << "time: " << dt << "s";
+    }
 
     for (auto& batch : *curValidset) {
       auto output = ntwrk->forward({fl::input(batch[kInputIdx])})
