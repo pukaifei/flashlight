@@ -123,7 +123,7 @@ int main(int argc, char** argv) {
   fl::lib::text::Dictionary tokenDict(dictPath);
   // Setup-specific modifications
   for (int64_t r = 1; r <= FLAGS_replabel; ++r) {
-    tokenDict.addEntry(std::to_string(r));
+    tokenDict.addEntry("<" + std::to_string(r) + ">");
   }
   // ctc expects the blank label last
   if (FLAGS_criterion == kCtcCriterion) {
@@ -176,8 +176,15 @@ int main(int argc, char** argv) {
     // Hypothesis
     auto tokenPrediction =
         afToVector<int>(criterion->viterbiPath(rawEmission.array()));
-    auto letterPrediction =
-        tknPrediction2Ltr(tokenPrediction, tokenDict, FLAGS_wordseparator);
+    auto letterPrediction = tknPrediction2Ltr(
+        tokenPrediction,
+        tokenDict,
+        FLAGS_criterion,
+        FLAGS_surround,
+        FLAGS_eostoken,
+        FLAGS_replabel,
+        FLAGS_usewordpiece,
+        FLAGS_wordseparator);
     std::vector<std::string> wordPrediction =
         tkn2Wrd(letterPrediction, FLAGS_wordseparator);
 
