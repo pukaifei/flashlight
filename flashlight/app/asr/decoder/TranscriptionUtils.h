@@ -29,6 +29,7 @@ namespace asr {
 std::vector<std::string> tknIdx2Ltr(
     const std::vector<int>& labels,
     const fl::lib::text::Dictionary& d,
+    bool useWordPiece,
     const std::string& wordSep);
 
 std::vector<std::string> tkn2Wrd(
@@ -36,17 +37,27 @@ std::vector<std::string> tkn2Wrd(
     const std::string& wordSep);
 
 std::vector<std::string> wrdIdx2Wrd(
-    const std::vector<int>&,
-    const fl::lib::text::Dictionary&);
+    const std::vector<int>& input,
+    const fl::lib::text::Dictionary& wordDict);
 
 std::vector<std::string> tknTarget2Ltr(
     std::vector<int> tokens,
     const fl::lib::text::Dictionary& tokenDict,
+    const std::string& criterion,
+    const std::string& surround,
+    const bool eosTkn,
+    const int replabel,
+    const bool useWordPiece,
     const std::string& wordSep);
 
 std::vector<std::string> tknPrediction2Ltr(
     std::vector<int> tokens,
     const fl::lib::text::Dictionary& tokenDict,
+    const std::string& criterion,
+    const std::string& surround,
+    const bool eosTkn,
+    const int replabel,
+    const bool useWordPiece,
     const std::string& wordSep);
 
 std::vector<int> tkn2Idx(
@@ -59,15 +70,18 @@ std::vector<int> validateIdx(std::vector<int> input, int unkIdx);
 template <class T>
 void remapLabels(
     std::vector<T>& labels,
-    const fl::lib::text::Dictionary& dict) {
-  if (FLAGS_eostoken) {
+    const fl::lib::text::Dictionary& dict,
+    const std::string& surround,
+    const bool eosTkn,
+    const int replabel) {
+  if (eosTkn) {
     int eosidx = dict.getIndex(kEosToken);
     while (!labels.empty() && labels.back() == eosidx) {
       labels.pop_back();
     }
   }
-  if (FLAGS_replabel > 0) {
-    labels = unpackReplabels(labels, dict, FLAGS_replabel);
+  if (replabel > 0) {
+    labels = unpackReplabels(labels, dict, replabel);
   }
   auto trimLabels = [&labels](int idx) {
     if (!labels.empty() && labels.back() == idx) {
@@ -80,8 +94,8 @@ void remapLabels(
   if (dict.contains(kSilToken)) {
     trimLabels(dict.getIndex(kSilToken));
   }
-  if (!FLAGS_surround.empty()) {
-    trimLabels(dict.getIndex(FLAGS_surround));
+  if (!surround.empty()) {
+    trimLabels(dict.getIndex(surround));
   }
 };
 } // namespace asr

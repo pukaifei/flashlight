@@ -20,12 +20,13 @@ namespace asr {
 std::vector<std::string> tknIdx2Ltr(
     const std::vector<int>& labels,
     const Dictionary& d,
+    const bool useWordPiece,
     const std::string& wordSep) {
   std::vector<std::string> result;
 
   for (auto id : labels) {
     auto token = d.getEntry(id);
-    if (FLAGS_usewordpiece) {
+    if (useWordPiece) {
       auto splitToken = splitWrd(token);
       for (const auto& c : splitToken) {
         result.emplace_back(c);
@@ -36,7 +37,7 @@ std::vector<std::string> tknIdx2Ltr(
   }
 
   if (result.size() > 0 && !wordSep.empty()) {
-    if (result.front() == FLAGS_wordseparator) {
+    if (result.front() == wordSep) {
       result.erase(result.begin());
     }
     if (!result.empty() && result.back() == wordSep) {
@@ -81,41 +82,51 @@ std::vector<std::string> wrdIdx2Wrd(
 std::vector<std::string> tknTarget2Ltr(
     std::vector<int> tokens,
     const Dictionary& tokenDict,
+    const std::string& criterion,
+    const std::string& surround,
+    const bool eosTkn,
+    const int replabel,
+    const bool useWordPiece,
     const std::string& wordSep) {
   if (tokens.empty()) {
     return std::vector<std::string>{};
   }
 
-  if (FLAGS_criterion == kSeq2SeqCriterion) {
+  if (criterion == kSeq2SeqCriterion) {
     if (tokens.back() == tokenDict.getIndex(kEosToken)) {
       tokens.pop_back();
     }
   }
-  remapLabels(tokens, tokenDict);
+  remapLabels(tokens, tokenDict, surround, eosTkn, replabel);
 
-  return tknIdx2Ltr(tokens, tokenDict, wordSep);
+  return tknIdx2Ltr(tokens, tokenDict, useWordPiece, wordSep);
 }
 
 std::vector<std::string> tknPrediction2Ltr(
     std::vector<int> tokens,
     const Dictionary& tokenDict,
+    const std::string& criterion,
+    const std::string& surround,
+    const bool eosTkn,
+    const int replabel,
+    const bool useWordPiece,
     const std::string& wordSep) {
   if (tokens.empty()) {
     return std::vector<std::string>{};
   }
 
-  if (FLAGS_criterion == kCtcCriterion || FLAGS_criterion == kAsgCriterion) {
+  if (criterion == kCtcCriterion || criterion == kAsgCriterion) {
     dedup(tokens);
   }
-  if (FLAGS_criterion == kCtcCriterion) {
+  if (criterion == kCtcCriterion) {
     int blankIdx = tokenDict.getIndex(kBlankToken);
     tokens.erase(
         std::remove(tokens.begin(), tokens.end(), blankIdx), tokens.end());
   }
   tokens = validateIdx(tokens, -1);
-  remapLabels(tokens, tokenDict);
+  remapLabels(tokens, tokenDict, surround, eosTkn, replabel);
 
-  return tknIdx2Ltr(tokens, tokenDict, wordSep);
+  return tknIdx2Ltr(tokens, tokenDict, useWordPiece, wordSep);
 }
 
 std::vector<int> tkn2Idx(

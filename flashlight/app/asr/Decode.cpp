@@ -363,8 +363,15 @@ int main(int argc, char** argv) {
       if (FLAGS_uselexicon) {
         wordTargetStr = wrdIdx2Wrd(wordTarget, wordDict);
       } else {
-        auto letterTarget =
-            tknTarget2Ltr(tokenTarget, tokenDict, FLAGS_wordseparator);
+        auto letterTarget = tknTarget2Ltr(
+            tokenTarget,
+            tokenDict,
+            FLAGS_criterion,
+            FLAGS_surround,
+            FLAGS_eostoken,
+            FLAGS_replabel,
+            FLAGS_usewordpiece,
+            FLAGS_wordseparator);
         wordTargetStr = tkn2Wrd(letterTarget, FLAGS_wordseparator);
       }
 
@@ -540,17 +547,15 @@ int main(int argc, char** argv) {
     } else {
       if (FLAGS_decodertype == "wrd") {
         decoder.reset(new LexiconDecoder(
-            {
-                .beamSize = FLAGS_beamsize,
-                .beamSizeToken = FLAGS_beamsizetoken,
-                .beamThreshold = FLAGS_beamthreshold,
-                .lmWeight = FLAGS_lmweight,
-                .wordScore = FLAGS_wordscore,
-                .unkScore = FLAGS_unkscore,
-                .silScore = FLAGS_silscore,
-                .logAdd = FLAGS_logadd,
-                .criterionType = criterionType
-            },
+            {.beamSize = FLAGS_beamsize,
+             .beamSizeToken = FLAGS_beamsizetoken,
+             .beamThreshold = FLAGS_beamthreshold,
+             .lmWeight = FLAGS_lmweight,
+             .wordScore = FLAGS_wordscore,
+             .unkScore = FLAGS_unkscore,
+             .silScore = FLAGS_silscore,
+             .logAdd = FLAGS_logadd,
+             .criterionType = criterionType},
             trie,
             localLm,
             silIdx,
@@ -564,17 +569,15 @@ int main(int argc, char** argv) {
       } else if (FLAGS_decodertype == "tkn") {
         if (FLAGS_uselexicon) {
           decoder.reset(new LexiconDecoder(
-              {
-                  .beamSize = FLAGS_beamsize,
-                  .beamSizeToken = FLAGS_beamsizetoken,
-                  .beamThreshold = FLAGS_beamthreshold,
-                  .lmWeight = FLAGS_lmweight,
-                  .wordScore = FLAGS_wordscore,
-                  .unkScore = FLAGS_unkscore,
-                  .silScore = FLAGS_silscore,
-                  .logAdd = FLAGS_logadd,
-                  .criterionType = criterionType
-              },
+              {.beamSize = FLAGS_beamsize,
+               .beamSizeToken = FLAGS_beamsizetoken,
+               .beamThreshold = FLAGS_beamthreshold,
+               .lmWeight = FLAGS_lmweight,
+               .wordScore = FLAGS_wordscore,
+               .unkScore = FLAGS_unkscore,
+               .silScore = FLAGS_silscore,
+               .logAdd = FLAGS_logadd,
+               .criterionType = criterionType},
               trie,
               localLm,
               silIdx,
@@ -587,18 +590,16 @@ int main(int argc, char** argv) {
               << tid;
         } else {
           decoder.reset(new LexiconFreeDecoder(
-              {
-                  .beamSize = FLAGS_beamsize,
-                  .beamSizeToken = FLAGS_beamsizetoken,
-                  .beamThreshold = FLAGS_beamthreshold,
-                  .lmWeight = FLAGS_lmweight,
-                  .silScore = FLAGS_silscore,
-                  .logAdd = FLAGS_logadd,
-                  .criterionType = criterionType
-              }, 
-              localLm, 
-              silIdx, 
-              blankIdx, 
+              {.beamSize = FLAGS_beamsize,
+               .beamSizeToken = FLAGS_beamsizetoken,
+               .beamThreshold = FLAGS_beamthreshold,
+               .lmWeight = FLAGS_lmweight,
+               .silScore = FLAGS_silscore,
+               .logAdd = FLAGS_logadd,
+               .criterionType = criterionType},
+              localLm,
+              silIdx,
+              blankIdx,
               transition));
           FL_LOG(fl::INFO)
               << "[Decoder] Lexicon-free decoder with token-LM loaded in thread: "
@@ -633,10 +634,24 @@ int main(int argc, char** argv) {
         auto rawWordPrediction = results[i].words;
         auto rawTokenPrediction = results[i].tokens;
 
-        auto letterTarget =
-            tknTarget2Ltr(tokenTarget, tokenDict, FLAGS_wordseparator);
+        auto letterTarget = tknTarget2Ltr(
+            tokenTarget,
+            tokenDict,
+            FLAGS_criterion,
+            FLAGS_surround,
+            FLAGS_eostoken,
+            FLAGS_replabel,
+            FLAGS_usewordpiece,
+            FLAGS_wordseparator);
         auto letterPrediction = tknPrediction2Ltr(
-            rawTokenPrediction, tokenDict, FLAGS_wordseparator);
+            rawTokenPrediction,
+            tokenDict,
+            FLAGS_criterion,
+            FLAGS_surround,
+            FLAGS_eostoken,
+            FLAGS_replabel,
+            FLAGS_usewordpiece,
+            FLAGS_wordseparator);
         std::vector<std::string> wordPrediction;
         if (FLAGS_uselexicon) {
           rawWordPrediction =

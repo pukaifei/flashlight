@@ -543,9 +543,24 @@ int main(int argc, char** argv) {
 
       // remap actual, predicted targets for evaluating edit distance error
 
-      auto ltrPred =
-          tknPrediction2Ltr(viterbipath, tokenDict, FLAGS_wordseparator);
-      auto ltrTgt = tknTarget2Ltr(tgtraw, tokenDict, FLAGS_wordseparator);
+      auto ltrPred = tknPrediction2Ltr(
+          viterbipath,
+          tokenDict,
+          FLAGS_criterion,
+          FLAGS_surround,
+          FLAGS_eostoken,
+          FLAGS_replabel,
+          FLAGS_usewordpiece,
+          FLAGS_wordseparator);
+      auto ltrTgt = tknTarget2Ltr(
+          tgtraw,
+          tokenDict,
+          FLAGS_criterion,
+          FLAGS_surround,
+          FLAGS_eostoken,
+          FLAGS_replabel,
+          FLAGS_usewordpiece,
+          FLAGS_wordseparator);
 
       auto wrdPred = tkn2Wrd(ltrPred, FLAGS_wordseparator);
       auto wrdTgt = tkn2Wrd(ltrTgt, FLAGS_wordseparator);
