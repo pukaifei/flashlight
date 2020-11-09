@@ -234,8 +234,15 @@ int main(int argc, char** argv) {
       auto wordTarget = afToVector<int>(sample[kWordIdx]);
       auto sampleId = readSampleIds(sample[kSampleIdx]).front();
 
-      auto letterTarget =
-          tknTarget2Ltr(tokenTarget, tokenDict, FLAGS_wordseparator);
+      auto letterTarget = tknTarget2Ltr(
+          tokenTarget,
+          tokenDict,
+          FLAGS_criterion,
+          FLAGS_surround,
+          FLAGS_eostoken,
+          FLAGS_replabel,
+          FLAGS_usewordpiece,
+          FLAGS_wordseparator);
       std::vector<std::string> wordTargetStr;
       if (FLAGS_uselexicon) {
         wordTargetStr = wrdIdx2Wrd(wordTarget, wordDict);
@@ -246,8 +253,15 @@ int main(int argc, char** argv) {
       // Tokens
       auto tokenPrediction =
           afToVector<int>(localCriterion->viterbiPath(rawEmission.array()));
-      auto letterPrediction =
-          tknPrediction2Ltr(tokenPrediction, tokenDict, FLAGS_wordseparator);
+      auto letterPrediction = tknPrediction2Ltr(
+          tokenPrediction,
+          tokenDict,
+          FLAGS_criterion,
+          FLAGS_surround,
+          FLAGS_eostoken,
+          FLAGS_replabel,
+          FLAGS_usewordpiece,
+          FLAGS_wordseparator);
 
       meters.lerSlice.add(letterPrediction, letterTarget);
 
