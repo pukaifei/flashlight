@@ -5,20 +5,33 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "flashlight/fl/app/asr/decoder/DecodeMaster.h"
+#include "flashlight/app/asr/decoder/DecodeMaster.h"
 
-#include "flashlight/ext/common/Utils-int.h"
-#include "flashlight/fl/app/asr/common/Defines.h"
+// #include "flashlight/fl/app/asr/common/Defines.h"
+#include "flashlight/app/asr/decoder/TranscriptionUtils.h"
+#include "flashlight/ext/common/Utils-inl.h"
 #include "flashlight/fl/dataset/MemoryBlobDataset.h"
-#include "flashlight/fl/lib/text/decoder/Decoder.h"
-#include "flashlight/fl/lib/text/decoder/LexiconDecoder.h"
-#include "flashlight/fl/lib/text/decoder/LexiconFreeDecoder.h"
+#include "flashlight/fl/meter/EditDistanceMeter.h"
+#include "flashlight/lib/text/decoder/LexiconDecoder.h"
+#include "flashlight/lib/text/decoder/LexiconFreeDecoder.h"
 
 namespace {
+
+constexpr size_t kDMTokenTargetIdx = 0;
+constexpr size_t kDMWordTargetIdx = 1;
+constexpr size_t kDMTokenPredIdx = 2;
+constexpr size_t kDMWordPredIdx = 3;
+
 af::array removeNegative(const af::array& arr) {
   return arr(arr >= 0);
 }
+af::array removePad(const af::array& arr, int32_t padIdx) {
+  return arr(arr != padIdx);
+}
 } // namespace
+
+// TDOD threading?
+
 namespace fl {
 namespace app {
 namespace asr {
@@ -29,7 +42,7 @@ DecodeMaster::DecodeMaster(
     bool isTokenLM,
     const fl::lib::text::Dictionary& tokenDict,
     const fl::lib::text::Dictionary& wordDict,
-    const trainOptions trainOpt)
+    const DecodeMasterTrainOptions trainOpt)
     : net_(net),
       lm_(lm),
       isTokenLM_(isTokenLM),
@@ -38,60 +51,79 @@ DecodeMaster::DecodeMaster(
       trainOpt_(trainOpt) {}
 
 std::tuple<std::vector<double>, std::vector<double>>
-DecodeMaster::computeLERWER(const std::shared_ptr<fl::Dataset>& pds) {
+DecodeMaster::computeMetrics(
+  const std::shared_ptr<fl::Dataset>& pds, 
+  const std::string& wordSep) {
   fl::EditDistanceMeter wer, ler;
+  
   for (auto& sample : *pds) {
-    if (sample.size() <= kTokenIdx) {
+    if (sample.size() <= kDMWordPredIdx) {
       throw std::runtime_error(
-          "computeLERWER: need word target to compute WER");
+          "computeMetrics: need token/word target to compute WER");
     }
-    auto prediction = sample[kInputIdx];
-    auto target = sample[kTokenIdx];
+    auto predictionWrd = sample[kDMWordPredIdx];
+    auto targetWrd = sample[kDMWordTargetIdx];
+    auto prediction =  sample[kDMTokenPredIdx];
+    auto target =  sample[kDMTokenTargetIdx];
+    bool isWords = !sample[kDMWordPredIdx].isempty();
+    
     if (prediction.numdims() > 2 || target.numdims() > 2) {
       throw std::runtime_error(
-          "computeLERWER: expecting TxB for prediction and target");
+          "computeMetrics: expecting TxB for prediction and target");
     }
+    if (isWords && (predictionWrd.numdims() > 2 || targetWrd.numdims() > 2)) {
+      throw std::runtime_error(
+          "computeMetrics: expecting TxB for prediction and target");
+    }
+    
     if (!prediction.isempty() && !target.isempty() &&
         (prediction.dims(1) != target.dims(1))) {
       throw std::runtime_error(
-          "computeLERWER: prediction and target do not match");
+          "computeMetrics: prediction and target do not match");
+    }
+    if (isWords && !predictionWrd.isempty() && !targetWrd.isempty() &&
+        (predictionWrd.dims(1) != targetWrd.dims(1))) {
+      throw std::runtime_error(
+          "computeMetrics: prediction and target do not match");
     }
     // token predictions and target
-    std::vector<int> predictionV = afToVector<int>(prediction);
-    std::vector<int> targetV = afToVector<int>(target);
-    predictionV = postProcessPred(predictionV);
-    targetV = postProcessTarget(targetV);
+    std::vector<int> predictionV = fl::ext::afToVector<int>(prediction);
+    std::vector<int> targetV = fl::ext::afToVector<int>(target);
 
-    std::vector<std::string> predictionS =
-        tknIdx2Ltr(predictionV, tokenDict_, silToken);
-    std::vector<std::string> targetS =
-        tknIdx2Ltr(targetV, tokenDict_, silToken);
+    auto predictionS = computeStringPred(predictionV, wordSep);
+    auto targetS = computeStringTarget(targetV, wordSep);
     ler.add(predictionS, targetS);
-    wer.add(tkn2Wrd(predictionS), tkn2Wrd(targetS));
+
+    std::vector<std::string> targetWrdS, predictionWrdS;
+    if (isWords) {
+      targetWrdS = wrdIdx2Wrd(fl::ext::afToVector<int>(targetWrd), wordDict_);
+      predictionWrdS = wrdIdx2Wrd(fl::ext::afToVector<int>(predictionWrd), wordDict_);
+    } else {
+      targetWrdS = tkn2Wrd(targetS, wordSep);
+      predictionWrdS = tkn2Wrd(predictionS, wordSep);
+    }
+    wer.add(predictionWrdS, targetWrdS);
   }
   return {ler.value(), wer.value()};
 }
 
-std::vector<std::string> postProcessTarget(const std::vector<int>& tknIdxSeq) {}
-
-std::shared_ptr<Trie> DecodeMaster::buildTrie(
-    const fl::lib::text:: ::LexiconMap& lexicon,
-    std::string silToken,
-    fl::lib::text::SmearingMode smearMode,
-    int replabel) const {
-  auto trie = std::make_shared<Trie>(
-      tokenDict_.indexSize(), tokenDict_.getIndex(silToken));
+std::shared_ptr<fl::lib::text::Trie> DecodeMaster::buildTrie(
+    const fl::lib::text::LexiconMap& lexicon,
+    const std::string& wordSep,
+    fl::lib::text::SmearingMode smearMode) const {
+  auto trie = std::make_shared<fl::lib::text::Trie>(
+      tokenDict_.indexSize(), tokenDict_.getIndex(wordSep));
   auto startState = lm_->start(false);
   for (auto& it : lexicon) {
     const std::string& word = it.first;
     int usrIdx = wordDict_.getIndex(word);
     float score = 0;
     if (!isTokenLM_) {
-      LMStatePtr dummyState;
+      fl::lib::text::LMStatePtr dummyState;
       std::tie(dummyState, score) = lm_->score(startState, usrIdx);
     }
     for (auto& tokens : it.second) {
-      auto tokensTensor = tkn2Idx(tokens, tokenDict_, replabel);
+      auto tokensTensor = tkn2Idx(tokens, tokenDict_, trainOpt_.repLabel);
       trie->insert(tokensTensor, usrIdx, score);
     }
   }
@@ -101,7 +133,8 @@ std::shared_ptr<Trie> DecodeMaster::buildTrie(
 }
 
 std::shared_ptr<fl::Dataset> DecodeMaster::forward(
-    const std::shared_ptr<fl::Dataset>& ds) {
+    const std::shared_ptr<fl::Dataset>& ds,
+    const int32_t padIdx) {
   auto eds = std::make_shared<fl::MemoryBlobDataset>();
   for (auto& batch : *ds) {
     auto output = net_->forward({fl::input(batch[kInputIdx])}).front().array();
@@ -122,12 +155,14 @@ std::shared_ptr<fl::Dataset> DecodeMaster::forward(
         (wordTarget.numdims() > 2 || wordTarget.dims(1) != B)) {
       throw std::runtime_error("word target should be LxB");
     }
-    // todo s2s
+    // todo s2s, if we pad only with -1 we will be good here (not pad with eos)
     for (int b = 0; b < B; b++) {
-      std::vector<af::array> res(3);
-      res[kInputIdx] = output(af::span, af::span, b);
-      res[kTargetIdx] = removeNegative(tokenTarget(af::span, b));
-      res[kWordIdx] = removeNegative(wordTarget(af::span, b));
+      std::vector<af::array> res(4);
+      res[kDMTokenPredIdx] = output(af::span, af::span, b);
+      res[kDMTokenTargetIdx] = removeNegative(tokenTarget(af::span, b));
+      res[kDMTokenTargetIdx] = removePad(res[kTargetIdx], padIdx);
+      res[kDMWordTargetIdx] = removeNegative(wordTarget(af::span, b));
+      res[kDMWordTargetIdx] = removePad(res[kWordIdx], padIdx);
       eds->add(res);
     }
   }
@@ -135,18 +170,12 @@ std::shared_ptr<fl::Dataset> DecodeMaster::forward(
   return eds;
 }
 
-// threading?
-// wer on tokens, what to do in case of lexfree
-// cleaning predicitons?
-// replabel -> <1>
-// fix wer from tokes, squeeze in each decoder
-
 std::shared_ptr<fl::Dataset> DecodeMaster::decode(
     const std::shared_ptr<fl::Dataset>& eds,
     fl::lib::text::Decoder& decoder) {
   auto pds = std::make_shared<fl::MemoryBlobDataset>();
   for (auto& sample : *eds) {
-    auto emission = sample[kInputIdx];
+    auto emission = sample[kDMTokenPredIdx];
     if (emission.numdims() > 2) {
       throw std::runtime_error("emission should be NxT");
     }
@@ -154,10 +183,15 @@ std::shared_ptr<fl::Dataset> DecodeMaster::decode(
     emission.as(af::dtype::f32).host(emissionV.data());
     auto results =
         decoder.decode(emissionV.data(), emission.dims(1), emission.dims(0));
-    std::vector<int> wordsV = results.at(0).words;
+    
     std::vector<int> tokensV = results.at(0).tokens;
+    std::vector<int> wordsV = results.at(0).words;
+    tokensV.erase(std::remove(tokensV.begin(), tokensV.end(), -1), tokensV.end());
     wordsV.erase(std::remove(wordsV.begin(), wordsV.end(), -1), wordsV.end());
-    sample[kInputIdx] =
+    sample[kDMTokenPredIdx] =
+        (tokensV.size() > 0 ? af::array(af::dim4(tokensV.size()), tokensV.data())
+                            : af::array());
+    sample[kDMWordPredIdx] =
         (wordsV.size() > 0 ? af::array(af::dim4(wordsV.size()), wordsV.data())
                            : af::array());
     pds->add(sample);
@@ -170,24 +204,22 @@ TokenDecodeMaster::TokenDecodeMaster(
     const std::shared_ptr<fl::Module> net,
     const std::shared_ptr<fl::lib::text::LM> lm,
     const fl::lib::text::Dictionary& tokenDict,
-    const fl::lib::text::Dictionary& wordDict)
-    : DecodeMaster(net, lm, true, tokenDict, wordDict) {}
+    const fl::lib::text::Dictionary& wordDict,
+    const DecodeMasterTrainOptions trainOpt)
+    : DecodeMaster(net, lm, true, tokenDict, wordDict, trainOpt) {}
 
 std::shared_ptr<fl::Dataset> TokenDecodeMaster::decode(
     const std::shared_ptr<fl::Dataset>& eds,
     DecodeMasterLexiconFreeOptions opt) {
   std::vector<float> transition;
-  fl::lib::text::DecoderOptions decoderOpt(
-      opt.beamSize,
-      opt.beamSizeToken,
-      opt.beamThreshold,
-      opt.lmWeight,
-      0,
-      0,
-      opt.silScore,
-      0,
-      opt.logAdd,
-      CriterionType::CTC);
+  fl::lib::text::LexiconFreeDecoderOptions decoderOpt{
+      .beamSize = opt.beamSize,
+      .beamSizeToken = opt.beamSizeToken,
+      .beamThreshold = opt.beamThreshold,
+      .lmWeight = opt.lmWeight,
+      .silScore = opt.silScore,
+      .logAdd = opt.logAdd,
+      .criterionType = fl::lib::text::CriterionType::CTC};
   auto silIdx = tokenDict_.getIndex(opt.silToken);
   auto blankIdx = tokenDict_.getIndex(opt.blankToken);
   fl::lib::text::LexiconFreeDecoder decoder(
@@ -198,58 +230,113 @@ std::shared_ptr<fl::Dataset> TokenDecodeMaster::decode(
 std::shared_ptr<fl::Dataset> TokenDecodeMaster::decode(
     const std::shared_ptr<fl::Dataset>& eds,
     const fl::lib::text::LexiconMap& lexicon,
-    fl::lib::text::DecodeMasterLexiconOptions opt) {
+    DecodeMasterLexiconOptions opt) {
   std::vector<float> transition;
-  auto trie = buildTrie(lexicon, opt.silToken, opt.smearMode, opt.repLabel);
-  fl::lib::text::DecoderOptions decoderOpt(
-      opt.beamSize,
-      opt.beamSizeToken,
-      opt.beamThreshold,
-      opt.lmWeight,
-      0,
-      0,
-      opt.silScore,
-      0,
-      opt.logAdd,
-      CriterionType::CTC);
+  auto trie = buildTrie(lexicon, opt.silToken, opt.smearMode);
+  fl::lib::text::LexiconDecoderOptions decoderOpt{
+      .beamSize = opt.beamSize,
+      .beamSizeToken = opt.beamSizeToken,
+      .beamThreshold = opt.beamThreshold,
+      .lmWeight = opt.lmWeight,
+      .wordScore = opt.wordScore,
+      .unkScore = opt.unkScore,
+      .silScore = opt.silScore,
+      .logAdd = opt.logAdd,
+      .criterionType = fl::lib::text::CriterionType::CTC};
   auto silIdx = tokenDict_.getIndex(opt.silToken);
   auto blankIdx = tokenDict_.getIndex(opt.blankToken);
-  auto unkWordIdx = -1; // wordDict.getIndex(kUnkToken);
+  auto unkWordIdx = wordDict_.getIndex(fl::lib::text::kUnkToken);
   fl::lib::text::LexiconDecoder decoder(
       decoderOpt, trie, lm_, silIdx, blankIdx, unkWordIdx, transition, true);
   return DecodeMaster::decode(eds, decoder);
+}
+
+std::vector<std::string> TokenDecodeMaster::computeStringPred(
+    const std::vector<int>& tokenIdxSeq,
+    const std::string& wordSep) {
+  return tknPrediction2Ltr(
+    tokenIdxSeq,
+    tokenDict_,
+    "ctc",
+    trainOpt_.surround,
+    "", // eosToken
+    trainOpt_.repLabel,
+    trainOpt_.wordSepIsPartOfToken,
+    wordSep);
+}
+
+std::vector<std::string> TokenDecodeMaster::computeStringTarget(
+    const std::vector<int>& tokenIdxSeq,
+    const std::string& wordSep) {
+  return tknTarget2Ltr(
+    tokenIdxSeq,
+    tokenDict_,
+    "ctc",
+    trainOpt_.surround,
+    "", // eosToken
+    trainOpt_.repLabel,
+    trainOpt_.wordSepIsPartOfToken,
+    wordSep);
 }
 
 WordDecodeMaster::WordDecodeMaster(
     const std::shared_ptr<fl::Module> net,
     const std::shared_ptr<fl::lib::text::LM> lm,
     const fl::lib::text::Dictionary& tokenDict,
-    const fl::lib::text::Dictionary& wordDict)
-    : DecodeMaster(net, lm, false, tokenDict, wordDict) {}
+    const fl::lib::text::Dictionary& wordDict,
+    const DecodeMasterTrainOptions trainOpt)
+    : DecodeMaster(net, lm, false, tokenDict, wordDict, trainOpt) {}
 
 std::shared_ptr<fl::Dataset> WordDecodeMaster::decode(
     const std::shared_ptr<fl::Dataset>& eds,
     const fl::lib::text::LexiconMap& lexicon,
-    fl::lib::text::DecodeMasterLexiconOptions opt) {
+    DecodeMasterLexiconOptions opt) {
   std::vector<float> transition;
-  auto trie = buildTrie(lexicon, opt.silToken, opt.smearMode, opt.repLabel);
-  fl::lib::text::DecoderOptions decoderOpt(
-      opt.beamSize,
-      opt.beamSizeToken,
-      opt.beamThreshold,
-      opt.lmWeight,
-      opt.wordScore,
-      opt.unkScore,
-      opt.silScore,
-      0,
-      opt.logAdd,
-      CriterionType::CTC);
+  auto trie = buildTrie(lexicon, opt.silToken, opt.smearMode);
+  fl::lib::text::LexiconDecoderOptions decoderOpt{
+      .beamSize = opt.beamSize,
+      .beamSizeToken = opt.beamSizeToken,
+      .beamThreshold = opt.beamThreshold,
+      .lmWeight = opt.lmWeight,
+      .wordScore = opt.wordScore,
+      .unkScore = opt.unkScore,
+      .silScore = opt.silScore,
+      .logAdd = opt.logAdd,
+      .criterionType = fl::lib::text::CriterionType::CTC};
   auto silIdx = tokenDict_.getIndex(opt.silToken);
   auto blankIdx = tokenDict_.getIndex(opt.blankToken);
   auto unkWordIdx = wordDict_.getIndex(opt.unkToken);
-  w2l::LexiconDecoder decoder(
+  fl::lib::text::LexiconDecoder decoder(
       decoderOpt, trie, lm_, silIdx, blankIdx, unkWordIdx, transition, false);
   return DecodeMaster::decode(eds, decoder);
+}
+
+std::vector<std::string> WordDecodeMaster::computeStringPred(
+    const std::vector<int>& tokenIdxSeq,
+    const std::string& wordSep) {
+  return tknPrediction2Ltr(
+    tokenIdxSeq,
+    tokenDict_,
+    "ctc",
+    trainOpt_.surround,
+    "", // eosToken
+    trainOpt_.repLabel,
+    trainOpt_.wordSepIsPartOfToken,
+    wordSep);
+}
+
+std::vector<std::string> WordDecodeMaster::computeStringTarget(
+    const std::vector<int>& tokenIdxSeq,
+    const std::string& wordSep) {
+  return tknTarget2Ltr(
+    tokenIdxSeq,
+    tokenDict_,
+    "ctc",
+    trainOpt_.surround,
+    "", // eosToken
+    trainOpt_.repLabel,
+    trainOpt_.wordSepIsPartOfToken,
+    wordSep);
 }
 
 } // namespace asr
