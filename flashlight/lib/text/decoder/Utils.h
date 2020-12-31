@@ -83,6 +83,7 @@ void candidatesStore(
   }
 
   /* 2. Merge candidates */
+  // 所有的candidates按分数排序后，放到candidatePtrs
   std::sort(
       candidatePtrs.begin(),
       candidatePtrs.end(),
@@ -91,7 +92,7 @@ void candidatesStore(
         return cmp == 0 ? node1->score > node2->score : cmp > 0;
       });
 
-  int nHypAfterMerging = 1;
+  int nHypAfterMerging = 1; 
   for (int i = 1; i < candidatePtrs.size(); i++) {
     if (candidatePtrs[i]->compareNoScoreStates(
             candidatePtrs[nHypAfterMerging - 1]) != 0) {

@@ -30,6 +30,7 @@ void LexiconFreeDecoder::decodeBegin() {
 void LexiconFreeDecoder::decodeStep(const float* emissions, int T, int N) {
   int startFrame = nDecodedFrames_ - nPrunedFrames_;
   // Extend hyp_ buffer
+  // 提前扩展hyp_的存储空间
   if (hyp_.size() < startFrame + T + 2) {
     for (int i = hyp_.size(); i < startFrame + T + 2; i++) {
       hyp_.emplace(i, std::vector<LexiconFreeDecoderState>());
@@ -38,6 +39,8 @@ void LexiconFreeDecoder::decodeStep(const float* emissions, int T, int N) {
 
   std::vector<size_t> idx(N);
   // Looping over all the frames
+  // 把t时刻emissions中最大的beamSizeToken个值的index放到idx中
+  // 即只遍历概率最大的beamSizeToken个
   for (int t = 0; t < T; t++) {
     std::iota(idx.begin(), idx.end(), 0);
     if (N > opt_.beamSizeToken) {
@@ -50,17 +53,20 @@ void LexiconFreeDecoder::decodeStep(const float* emissions, int T, int N) {
           });
     }
 
+    //清空了candidates_(保存当前时刻的beam)
+    //清空candidates_,candidatePtrs_,初始化candidatesBestScore_为inf
     candidatesReset(candidatesBestScore_, candidates_, candidatePtrs_);
     for (const LexiconFreeDecoderState& prevHyp : hyp_[startFrame + t]) {
       const int prevIdx = prevHyp.token;
 
       for (int r = 0; r < std::min(opt_.beamSizeToken, N); ++r) {
         int n = idx[r];
+        // 当前时刻，需要向下扩展的beamSizeToken个char
         double amScore = emissions[t * N + n];
-        if (nDecodedFrames_ + t > 0 &&
-            opt_.criterionType == CriterionType::ASG) {
-          amScore += transitions_[n * N + prevIdx];
-        }
+        // if (nDecodedFrames_ + t > 0 &&
+        //     opt_.criterionType == CriterionType::ASG) {
+        //   amScore += transitions_[n * N + prevIdx];
+        // }
         double score = prevHyp.score + emissions[t * N + n];
         if (n == sil_) {
           score += opt_.silScore;
@@ -69,26 +75,32 @@ void LexiconFreeDecoder::decodeStep(const float* emissions, int T, int N) {
         if ((opt_.criterionType == CriterionType::ASG && n != prevIdx) ||
             (opt_.criterionType == CriterionType::CTC && n != blank_ &&
              (n != prevIdx || prevHyp.prevBlank))) {
+            //返回lm的状态和score
           auto lmStateScorePair = lm_->score(prevHyp.lmState, n);
           auto lmScore = lmStateScorePair.second;
 
+          //score及其之后参数调用LexiconFreeDecoderState构造函数生成一个struct对象，push到candidates_中
+          // 当前向下扩展的是不同于前面的char/前面是sil
+          // text会变化，新增一个char
           candidatesAdd(
               candidates_,
               candidatesBestScore_,
               opt_.beamThreshold,
-              score + opt_.lmWeight * lmScore,
+              score + opt_.lmWeight * lmScore,  
               lmStateScorePair.first,
               &prevHyp,
-              n,
+              n, //当前char对应的index
               false, // prevBlank
               prevHyp.amScore + amScore,
               prevHyp.lmScore + lmScore);
         } else if (opt_.criterionType == CriterionType::CTC && n == blank_) {
+            // 当前向下扩展的char是sil
+            // text不变
           candidatesAdd(
               candidates_,
               candidatesBestScore_,
               opt_.beamThreshold,
-              score,
+              score, //上次beam的概率+blank的声学概率，没有语言模型概率
               prevHyp.lmState,
               &prevHyp,
               n,
@@ -96,6 +108,8 @@ void LexiconFreeDecoder::decodeStep(const float* emissions, int T, int N) {
               prevHyp.amScore + amScore,
               prevHyp.lmScore);
         } else {
+            // 当前向下扩展的是和beam最后一个相同的char(no sil)
+            // text不变
           candidatesAdd(
               candidates_,
               candidatesBestScore_,
@@ -109,18 +123,19 @@ void LexiconFreeDecoder::decodeStep(const float* emissions, int T, int N) {
               prevHyp.lmScore);
         }
       }
-    }
+    } //t时刻的beam loop end
 
+    // merge
     candidatesStore(
         candidates_,
         candidatePtrs_,
-        hyp_[startFrame + t + 1],
+        hyp_[startFrame + t + 1], //放到t+1的位置
         opt_.beamSize,
         candidatesBestScore_ - opt_.beamThreshold,
         opt_.logAdd,
         false);
     updateLMCache(lm_, hyp_[startFrame + t + 1]);
-  }
+  } //t时刻loop end
   nDecodedFrames_ += T;
 }
 

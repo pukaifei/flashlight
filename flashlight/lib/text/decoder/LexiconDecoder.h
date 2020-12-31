@@ -162,7 +162,7 @@ class LexiconDecoder : public Decoder {
   std::vector<float> transitions_;
   // if LM is token-level (operates on the same level as acoustic model)
   // or it is word-level (in case of false)
-  bool isLmToken_;
+  bool isLmToken_; //语言模型是word还是token(和声学的建模单元一致)
 
   // All the hypothesis new candidates (can be larger than beamsize) proposed
   // based on the ones from previous frame

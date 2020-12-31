@@ -62,15 +62,18 @@ void LexiconDecoder::decodeStep(const float* emissions, int T, int N) {
       for (int r = 0; r < std::min(opt_.beamSizeToken, N); ++r) {
         int n = idx[r];
         auto iter = prevLex->children.find(n);
+        
         if (iter == prevLex->children.end()) {
           continue;
         }
         const TrieNodePtr& lex = iter->second;
         double amScore = emissions[t * N + n];
+        //ignore
         if (nDecodedFrames_ + t > 0 &&
             opt_.criterionType == CriterionType::ASG) {
           amScore += transitions_[n * N + prevIdx];
         }
+        // 上一时刻的分数+当前时刻声学分数
         double score = prevHyp.score + amScore;
         if (n == sil_) {
           score += opt_.silScore;
@@ -79,6 +82,7 @@ void LexiconDecoder::decodeStep(const float* emissions, int T, int N) {
         LMStatePtr lmState;
         double lmScore = 0.;
 
+        //true，和声学一致
         if (isLmToken_) {
           auto lmStateScorePair = lm_->score(prevHyp.lmState, n);
           lmState = lmStateScorePair.first;
@@ -86,6 +90,7 @@ void LexiconDecoder::decodeStep(const float* emissions, int T, int N) {
         }
 
         // We eat-up a new token
+        // ignore
         if (opt_.criterionType != CriterionType::CTC || prevHyp.prevBlank ||
             n != prevIdx) {
           if (!lex->children.empty()) {
@@ -110,7 +115,10 @@ void LexiconDecoder::decodeStep(const float* emissions, int T, int N) {
         }
 
         // If we got a true word
+        // 到达一个word
         for (auto label : lex->labels) {
+          // 1.如果lm是和声学建模单元一致，用char的index n去获取
+          // 2.如果lm是word-level用word_index=label获取
           if (!isLmToken_) {
             auto lmStateScorePair = lm_->score(prevHyp.lmState, label);
             lmState = lmStateScorePair.first;
@@ -129,9 +137,11 @@ void LexiconDecoder::decodeStep(const float* emissions, int T, int N) {
               false, // prevBlank
               prevHyp.amScore + amScore,
               prevHyp.lmScore + lmScore);
-        }
+        } //end for
 
         // If we got an unknown word
+        // 下一个char，语料中有，词表中没有的词，在语言模型中用unk_表示
+        // 如果前缀树没有到达一个word，认为每个char可能是unk_这个word
         if (lex->labels.empty() && (opt_.unkScore > kNegativeInfinity)) {
           if (!isLmToken_) {
             auto lmStateScorePair = lm_->score(prevHyp.lmState, unk_);
@@ -155,6 +165,7 @@ void LexiconDecoder::decodeStep(const float* emissions, int T, int N) {
       }
 
       /* (2) Try same lexicon node */
+      // ignore
       if (opt_.criterionType != CriterionType::CTC || !prevHyp.prevBlank ||
           prevLex == lexicon_->getRoot()) {
         int n = prevLex == lexicon_->getRoot() ? sil_ : prevIdx;
@@ -184,6 +195,7 @@ void LexiconDecoder::decodeStep(const float* emissions, int T, int N) {
       }
 
       /* (3) CTC only, try blank */
+      // 扩展blank
       if (opt_.criterionType == CriterionType::CTC) {
         int n = blank_;
         double amScore = emissions[t * N + n];
@@ -203,7 +215,7 @@ void LexiconDecoder::decodeStep(const float* emissions, int T, int N) {
       }
       // finish proposing
     }
-
+    // 合并相同路径的token
     candidatesStore(
         candidates_,
         candidatePtrs_,
@@ -218,6 +230,7 @@ void LexiconDecoder::decodeStep(const float* emissions, int T, int N) {
   nDecodedFrames_ += T;
 }
 
+//如果有到达word，则用到达word里面选取最后
 void LexiconDecoder::decodeEnd() {
   candidatesReset(candidatesBestScore_, candidates_, candidatePtrs_);
   bool hasNiceEnding = false;

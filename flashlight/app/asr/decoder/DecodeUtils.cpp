@@ -29,7 +29,12 @@ std::shared_ptr<fl::lib::text::Trie> buildTrie(
       tokenDict.indexSize(), wordSeparatorIdx);
   auto startState = lm->start(false);
 
+  // 生成发音词典的前缀树
+  //lexicon: hello: h e l l o
+  //it.first: hello
+  //it.second: h e l l o
   for (auto& it : lexicon) {
+    // hello
     const std::string& word = it.first;
     int usrIdx = wordDict.getIndex(word);
     float score = -1;
@@ -37,6 +42,7 @@ std::shared_ptr<fl::lib::text::Trie> buildTrie(
       fl::lib::text::LMStatePtr dummyState;
       std::tie(dummyState, score) = lm->score(startState, usrIdx);
     }
+    //h e l l o
     for (auto& tokens : it.second) {
       auto tokensTensor = tkn2Idx(tokens, tokenDict, repLabel);
       trie->insert(tokensTensor, usrIdx, score);

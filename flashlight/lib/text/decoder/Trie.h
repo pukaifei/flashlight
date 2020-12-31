@@ -35,6 +35,7 @@ struct TrieNode {
   }
 
   // Pointers to the children of a node
+  // int是这个token的id
   std::unordered_map<int, std::shared_ptr<TrieNode>> children;
 
   // Node index
@@ -42,6 +43,7 @@ struct TrieNode {
 
   // Labels of words that are constructed from the given path. Note that
   // `labels` is nonempty only if the current node represents a completed token.
+  // 当前char和前面的char可以组成一个word
   std::vector<int> labels;
 
   // Scores (`scores` should have the same size as `labels`)

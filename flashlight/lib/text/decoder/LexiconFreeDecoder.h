@@ -65,12 +65,22 @@ struct LexiconFreeDecoderState {
         lmScore(0.) {}
 
   int compareNoScoreStates(const LexiconFreeDecoderState* node) const {
+    /* 可能的情况
+     * a
+     * aa
+     * a<sil>
+     * a<sil>a
+     */
+    //相等返回0
     int lmCmp = lmState->compare(node->lmState);
     if (lmCmp != 0) {
       return lmCmp > 0 ? 1 : -1;
     } else if (token != node->token) {
+        //两个beam的最后一个char不相等
+        //a-b a-sil sil-b
       return token > node->token ? 1 : -1;
     } else if (prevBlank != node->prevBlank) {
+        //区分aa和a<sil>a的情况，不能merge
       return prevBlank > node->prevBlank ? 1 : -1;
     }
     return 0;
